@@ -24,8 +24,20 @@ __all__ = ["KiCadSymProcessor"]
 
 LOGGER = logging.getLogger(__name__)
 
-#: Fields this processor owns. ``Description`` is deliberately excluded.
-MANAGED_FIELDS = ("Voltage", "Operating Temperature", "Package")
+#: Fields this processor owns, following the project's Min/Max convention.
+#: ``Description`` is deliberately excluded: KiCad derives it and rewriting it
+#: forces a full symbol re-render in the editor.
+#: ``Voltage Rating`` is included as the fallback for parts that publish a
+#: single voltage rather than a range, so a lone value is never dropped.
+MANAGED_FIELDS = (
+    "Voltage Min",
+    "Voltage Max",
+    "Voltage Rating",
+    "Temperature Min",
+    "Temperature Max",
+    "Operating Temperature",
+    "Package",
+)
 
 #: KiCad writes these fields at a zeroed position because they are hidden.
 _HIDDEN_AT = "(at 0 0 0)"

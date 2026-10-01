@@ -36,16 +36,18 @@ CAP = ComponentData(
     mpn="GRM155R61C104KA88D",
     manufacturer="Murata",
     description="MLCC 0.1uF",
-    voltage="16 VDC",
-    operating_temp="-55 C / +85 C",
+    voltage_text="16 VDC",
+    temp_min="-55 C",
+    temp_max="+85 C",
     package="0402",
 )
 RES = ComponentData(
     mpn="RC0402FR-0710KL",
     manufacturer="Yageo",
     description="Thick Film Resistor 10K",
-    voltage="50V",
-    operating_temp="-55 C / +155 C",
+    voltage_text="50 V",
+    temp_min="-55 C",
+    temp_max="+155 C",
     package="0402",
 )
 
@@ -94,7 +96,7 @@ class TestCSVProcessor:
         assert result.written is True
         text = path.read_text(encoding="utf-8")
         assert "Manufacturer" in text
-        assert "Operating Temperature" in text
+        assert "Temperature Min" in text and "Temperature Max" in text
         assert "Murata" in text
 
     def test_existing_field_is_updated_in_place(
@@ -103,7 +105,7 @@ class TestCSVProcessor:
         """An existing field keeps its column index and only its value changes."""
         path = tmp_path / "bom.csv"
         path.write_text(
-            '"Reference","Value","Part","Voltage"\n'
+            '"Reference","Value","Part","Voltage Rating"\n'
             '"C1","100nF","GRM155R61C104KA88D","0 VDC"\n',
             encoding="utf-8",
         )
@@ -112,8 +114,8 @@ class TestCSVProcessor:
 
         lines = path.read_text(encoding="utf-8").splitlines()
         header = [cell.strip('"') for cell in lines[0].split(",")]
-        # Voltage keeps index 3; new fields are appended after it.
-        assert header[:4] == ["Reference", "Value", "Part", "Voltage"]
+        # Voltage Rating keeps index 3; new fields are appended after it.
+        assert header[:4] == ["Reference", "Value", "Part", "Voltage Rating"]
         assert "Manufacturer" in header
         assert lines[1].split(",")[3].strip('"') == "16 VDC"
         assert "0 VDC" not in lines[1]
@@ -136,10 +138,10 @@ class TestCSVProcessor:
         """A fully up-to-date row produces no changes at all."""
         path = tmp_path / "bom.csv"
         path.write_text(
-            '"Reference","Value","Part","Manufacturer","Description","Voltage",'
-            '"Operating Temperature","Package"\n'
+            '"Reference","Value","Part","Manufacturer","Description",'
+            '"Voltage Rating","Temperature Min","Temperature Max","Package"\n'
             '"C1","100nF","GRM155R61C104KA88D","Murata","MLCC 0.1uF","16 VDC",'
-            '"-55 C / +85 C","0402"\n',
+            '"-55 C","+85 C","0402"\n',
             encoding="utf-8",
         )
 
@@ -263,7 +265,7 @@ class TestKiCadSymProcessor:
         result = KiCadSymProcessor(provider_with(**{CAP.mpn: CAP})).process(path)
 
         text = path.read_text(encoding="utf-8")
-        assert '"Voltage" "16 VDC"' in text
+        assert '"Voltage Rating" "16 VDC"' in text
         assert '"0 VDC"' not in text
         assert result.written is True
 
@@ -277,7 +279,8 @@ class TestKiCadSymProcessor:
         KiCadSymProcessor(provider_with(**{CAP.mpn: CAP})).process(path)
 
         text = path.read_text(encoding="utf-8")
-        assert '"Operating Temperature" "-55 C / +85 C"' in text
+        assert '"Temperature Min" "-55 C"' in text
+        assert '"Temperature Max" "+85 C"' in text
         assert '"Package" "0402"' in text
 
     def test_file_remains_parseable_after_edit(
@@ -359,7 +362,7 @@ class TestKiCadSymProcessor:
         tricky = ComponentData(
             mpn="GRM155R61C104KA88D",
             package='0402 "thin"',  # Package is a managed field
-            voltage="16 VDC",
+            voltage_text="16 VDC",
         )
         path = tmp_path / "lib.kicad_sym"
         path.write_text(kicad_sym_text, encoding="utf-8")
@@ -376,6 +379,54 @@ class TestKiCadSymProcessor:
             if isinstance(name, SString) and isinstance(value, SString):
                 values[name.value] = value.value
         assert values["Package"] == '0402 "thin"'
+
+    def test_single_valued_voltage_is_not_dropped(
+        self, tmp_path: Path, kicad_sym_text: str
+    ) -> None:
+        """Regression: a lone voltage must still reach the symbol.
+
+        A part that publishes one voltage rather than a range falls back to
+        ``Voltage Rating``. That field used to be absent from MANAGED_FIELDS,
+        so the value was filtered out and silently dropped.
+        """
+        single = ComponentData(
+            mpn="GRM155R61C104KA88D",
+            manufacturer="Murata",
+            voltage_text="16 VDC",
+            temp_min="-55 C",
+            temp_max="+85 C",
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(kicad_sym_text, encoding="utf-8")
+
+        result = KiCadSymProcessor(provider_with(**{single.mpn: single})).process(path)
+        text = path.read_text(encoding="utf-8")
+
+        assert '"Voltage Rating" "16 VDC"' in text
+        assert any(
+            change.field_name == "Voltage Rating" for change in result.changes
+        )
+
+    def test_voltage_min_max_are_written_when_ranged(
+        self, tmp_path: Path, kicad_sym_text: str
+    ) -> None:
+        """A ranged part writes Voltage Min and Voltage Max, not a rating."""
+        ranged = ComponentData(
+            mpn="GRM155R61C104KA88D",
+            voltage_min="2.65 V",
+            voltage_max="3.5 V",
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(kicad_sym_text, encoding="utf-8")
+
+        KiCadSymProcessor(provider_with(**{ranged.mpn: ranged})).process(path)
+        text = path.read_text(encoding="utf-8")
+
+        assert '"Voltage Min" "2.65 V"' in text
+        assert '"Voltage Max" "3.5 V"' in text
+        # The pre-existing Voltage Rating placeholder is left alone: a ranged
+        # part must not also gain a rating.
+        assert '"Voltage Rating" "0 VDC"' in text
 
     def test_idempotent_second_run(self, tmp_path: Path, kicad_sym_text: str) -> None:
         """Running twice makes no further changes."""

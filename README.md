@@ -115,9 +115,23 @@ ones appended.
 
 ## Managed fields
 
-CSV writes every normalised field. The KiCad processor deliberately manages only
-`Voltage`, `Operating Temperature` and `Package`, and skips `Description` —
-KiCad derives it, and rewriting it forces a full symbol re-render in the editor.
+Field names follow the project's existing convention: ranges are written as
+discrete `Min`/`Max` pairs, never as one free-text field.
+
+| Source data | Written fields |
+| --- | --- |
+| `-55/+150 C`, `-55 C / +85 C`, `-40C to +150C` | `Temperature Min` = `-55 C`, `Temperature Max` = `+150 C` |
+| `2.65 V to 3.6 V`, `1.8V-5.5V` | `Voltage Min` = `2.65 V`, `Voltage Max` = `3.6 V` |
+| `16 VDC`, `50 VDC` (a single value) | `Voltage Rating` = `16 VDC` |
+| `85 C` (a single value) | `Operating Temperature` = `85 C` |
+| any | `Manufacturer`, `Package` |
+
+A lone value is kept verbatim rather than being forced into a `Min` or `Max`
+that would misrepresent it. Both bounds are emitted **only** when the source
+actually contained two values.
+
+`Description` is never written: KiCad derives it, and rewriting it forces a full
+symbol re-render in the editor.
 
 ## Adding a provider
 
@@ -152,12 +166,15 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 70 tests
+python -m pytest -q                     # 105 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```
 
 All HTTP is mocked with `unittest.mock`; the suite runs offline.
+
+Range parsing is covered by `component_sync/tests/test_ranges.py`, which pins the
+separator styles and units that vendors actually use.
 
 ## License
 

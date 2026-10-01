@@ -34,12 +34,23 @@ class ChangeAction(Enum):
 class ComponentData:
     """Normalised parametric data for a single electronic component.
 
+    Ranges are carried as separate bounds rather than one free-text string, so
+    that they can be written using the project's established field names
+    (``Voltage Min`` / ``Voltage Max`` / ``Temperature Min`` /
+    ``Temperature Max``) rather than a single ambiguous field.
+
     Attributes:
         mpn: Manufacturer part number, used as the lookup key.
         manufacturer: Manufacturer name.
         description: Human readable part description.
-        voltage: Supply or working voltage range as reported by the vendor.
-        operating_temp: Operating temperature range as reported by the vendor.
+        voltage_min: Lower bound of the supply or working voltage.
+        voltage_max: Upper bound of the supply or working voltage.
+        voltage_text: Verbatim voltage string from the vendor, used only when a
+            single value or free text is returned and no bounds can be derived.
+        temp_min: Lower bound of the operating temperature.
+        temp_max: Upper bound of the operating temperature.
+        temp_text: Verbatim temperature string, used only when a single value or
+            free text is returned and no bounds can be derived.
         package: Package or case designation.
         raw_parameters: Every vendor parameter keyed by its normalised name.
             Values are preserved verbatim so that information which has no
@@ -49,27 +60,91 @@ class ComponentData:
     mpn: str
     manufacturer: str = ""
     description: str = ""
-    voltage: str = ""
-    operating_temp: str = ""
+    voltage_min: str = ""
+    voltage_max: str = ""
+    voltage_text: str = ""
+    temp_min: str = ""
+    temp_max: str = ""
+    temp_text: str = ""
     package: str = ""
     raw_parameters: dict[str, str] = field(default_factory=dict)
 
-    def as_properties(self) -> dict[str, str]:
-        """Return the non-empty fields as a KiCad property mapping.
+    @staticmethod
+    def _fmt_bound(value: float, unit: str, *, temperature: bool) -> str:
+        """Format one bound canonically.
 
-        Empty strings are omitted so that blank placeholders are never written
-        into a symbol library.
+        The absolute value is rendered and the sign is applied separately, so a
+        negative bound never produces a doubled sign such as ``--55 C``.
+
+        Args:
+            value: The numeric bound.
+            unit: Unit suffix, for example ``"C"`` or ``"V"``.
+            temperature: When true, an explicit ``+`` is used for non-negative
+                values, matching the ``+125 C`` convention used in symbol
+                libraries.
 
         Returns:
-            Mapping of KiCad field name to value, omitting empty values.
+            The formatted bound, or ``""`` when the value is not finite.
+        """
+        if value != value or value in (float("inf"), float("-inf")):
+            return ""
+        rounded = round(value, 3)
+        magnitude = abs(rounded)
+        if magnitude == int(magnitude):
+            rendered = str(int(magnitude))
+        else:
+            rendered = f"{magnitude:g}"
+        if temperature:
+            sign = "+" if rounded >= 0 else "-"
+            return f"{sign}{rendered} {unit}"
+        return f"{rendered} {unit}"
+
+    def voltage_properties(self) -> dict[str, str]:
+        """Return voltage fields using the project's Min/Max naming.
+
+        When both bounds are known the output is ``Voltage Min`` and
+        ``Voltage Max``. When the vendor returned a single value or free text
+        that cannot be split, the verbatim text is returned under
+        ``Voltage Rating`` rather than inventing a bound.
+
+        Returns:
+            Mapping of field name to value, omitting empty values.
+        """
+        if self.voltage_min and self.voltage_max:
+            return {"Voltage Min": self.voltage_min, "Voltage Max": self.voltage_max}
+        if self.voltage_text:
+            return {"Voltage Rating": self.voltage_text}
+        return {}
+
+    def temperature_properties(self) -> dict[str, str]:
+        """Return temperature fields using the project's Min/Max naming.
+
+        Returns:
+            Mapping of field name to value, omitting empty values.
+        """
+        if self.temp_min and self.temp_max:
+            return {"Temperature Min": self.temp_min, "Temperature Max": self.temp_max}
+        if self.temp_text:
+            return {"Operating Temperature": self.temp_text}
+        return {}
+
+    def as_properties(self) -> dict[str, str]:
+        """Return every non-empty field as a KiCad property mapping.
+
+        Field names follow the project convention: temperature and voltage
+        ranges are split into ``Min``/``Max`` pairs. Empty strings are omitted so
+        that blank placeholders are never written into a symbol library.
+
+        Returns:
+            Mapping of field name to value, omitting empty values.
         """
         mapping = {
             "Manufacturer": self.manufacturer,
             "Description": self.description,
-            "Voltage": self.voltage,
-            "Operating Temperature": self.operating_temp,
             "Package": self.package,
         }
+        mapping.update(self.voltage_properties())
+        mapping.update(self.temperature_properties())
         return {key: value for key, value in mapping.items() if value.strip()}
 
 

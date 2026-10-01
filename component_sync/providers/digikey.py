@@ -20,6 +20,7 @@ import requests
 
 from ..exceptions import ConfigurationError, PartNotFoundError, ProviderAPIError
 from ..models import ComponentData
+from ..ranges import parse_range
 from .base import BaseProvider
 
 __all__ = ["DigiKeyProvider"]
@@ -218,17 +219,49 @@ class DigiKeyProvider(BaseProvider):
                 parameters[name] = value
 
         manufacturer = product.get("Manufacturer", {}) or {}
+        voltage = _build_bounds(_first_match(parameters, _VOLTAGE_KEYS))
+        temperature = _build_bounds(_first_match(parameters, _TEMP_KEYS))
         return ComponentData(
             mpn=mpn,
             manufacturer=str(manufacturer.get("Name", "")).strip(),
             description=str(product.get("Description", "")).strip(),
-            voltage=_first_match(parameters, _VOLTAGE_KEYS),
-            operating_temp=_first_match(parameters, _TEMP_KEYS),
-            package=str(
-                (product.get("Package") or {}).get("Name", "")
-            ).strip(),
+            voltage_min=voltage[0],
+            voltage_max=voltage[1],
+            voltage_text=voltage[2],
+            temp_min=temperature[0],
+            temp_max=temperature[1],
+            temp_text=temperature[2],
+            package=str((product.get("Package") or {}).get("Name", "")).strip(),
             raw_parameters=parameters,
         )
+
+
+def _build_bounds(
+    text: str,
+) -> tuple[str, str, str]:
+    """Turn a vendor limit string into ``(min, max, verbatim_text)``.
+
+    Both bounds are emitted only when the source actually contained two values.
+    A single value keeps the original string so no information is lost and no
+    bound is invented.
+
+    Args:
+        text: The raw vendor parameter value.
+
+    Returns:
+        A ``(min, max, text)`` triple; empty strings where nothing was derived.
+    """
+    if not text.strip():
+        return ("", "", "")
+    bounds = parse_range(text)
+    if bounds is None or not bounds.has_bounds:
+        return ("", "", text.strip())
+    unit = bounds.unit or ""
+    low = ComponentData._fmt_bound(bounds.low or 0.0, unit, temperature=bounds.is_temperature)
+    high = ComponentData._fmt_bound(bounds.high or 0.0, unit, temperature=bounds.is_temperature)
+    if not low or not high:
+        return ("", "", text.strip())
+    return (low, high, "")
 
 
 def _first_match(parameters: dict[str, str], keys: tuple[str, ...]) -> str:

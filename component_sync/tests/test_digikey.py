@@ -7,6 +7,7 @@ with :mod:`unittest.mock`, so the suite runs offline and deterministically.
 from __future__ import annotations
 
 import base64
+import json
 from typing import Any, cast
 from unittest import mock
 
@@ -193,10 +194,52 @@ class TestFetchComponentData:
         assert isinstance(data, ComponentData)
         assert data.mpn == MPN
         assert data.manufacturer == "Murata"
-        assert data.voltage == "16 VDC"
-        assert data.operating_temp == "-55 C / +85 C"
         assert data.package == "0402"
         assert data.description.startswith("Multilayer Ceramic")
+
+    def test_range_parameter_is_split_into_bounds(self) -> None:
+        """A '16 VDC' style single value is preserved verbatim, not split."""
+        provider = self._authenticated(response(200, PRODUCT_PAYLOAD))
+        data = provider.fetch_component_data(MPN)
+        assert data.voltage_text == "16 VDC"
+        assert data.voltage_min == ""
+        assert data.voltage_max == ""
+        assert data.as_properties()["Voltage Rating"] == "16 VDC"
+
+    def test_temperature_range_is_split_into_bounds(self) -> None:
+        """A '-55 C / +85 C' style range becomes two discrete fields."""
+        payload = json.loads(json.dumps(PRODUCT_PAYLOAD))
+        payload["Products"][1]["Parameters"].append(
+            {"Parameter": "Operating Temperature", "Value": "-55 C / +150 C"}
+        )
+        # the fixture already carries a single -55/+85 value; replace it
+        payload["Products"][1]["Parameters"] = [
+            {"Parameter": "Voltage Rating", "Value": "16 VDC"},
+            {"Parameter": "Operating Temperature", "Value": "-55 C / +150 C"},
+        ]
+        provider = self._authenticated(response(200, payload))
+        data = provider.fetch_component_data(MPN)
+        assert data.temp_min == "-55 C"
+        assert data.temp_max == "+150 C"
+        assert data.temp_text == ""
+        properties = data.as_properties()
+        assert properties["Temperature Min"] == "-55 C"
+        assert properties["Temperature Max"] == "+150 C"
+        assert "Operating Temperature" not in properties
+
+    def test_voltage_range_uses_min_max_fields(self) -> None:
+        """A '2.65 V to 3.6 V' style range becomes Voltage Min/Max."""
+        payload = json.loads(json.dumps(PRODUCT_PAYLOAD))
+        payload["Products"][1]["Parameters"] = [
+            {"Parameter": "Voltage", "Value": "2.65 V to 3.6 V"},
+        ]
+        provider = self._authenticated(response(200, payload))
+        data = provider.fetch_component_data(MPN)
+        assert data.voltage_min == "2.65 V"
+        assert data.voltage_max == "3.6 V"
+        properties = data.as_properties()
+        assert properties["Voltage Min"] == "2.65 V"
+        assert properties["Voltage Max"] == "3.6 V"
 
     def test_raw_parameters_are_preserved(self) -> None:
         """Unmapped vendor parameters survive in raw_parameters."""
@@ -273,8 +316,11 @@ class TestFetchComponentData:
         }
         provider = self._authenticated(response(200, payload))
         data = provider.fetch_component_data(MPN)
-        assert data.voltage == ""
-        assert data.operating_temp == ""
+        assert data.voltage_min == ""
+        assert data.voltage_max == ""
+        assert data.voltage_text == ""
+        assert data.temp_min == ""
+        assert data.temp_max == ""
         assert data.package == "0603"
 
 

@@ -65,8 +65,9 @@ def sample_component() -> ComponentData:
         mpn="GRM155R61C104KA88D",
         manufacturer="Murata",
         description="Multilayer Ceramic Capacitors MLCC",
-        voltage="16 VDC",
-        operating_temp="-55 C / +85 C",
+        voltage_text="16 VDC",
+        temp_min="-55 C",
+        temp_max="+85 C",
         package="0402",
         raw_parameters={"Voltage Rating": "16 VDC"},
     )
@@ -117,7 +118,7 @@ def kicad_sym_text() -> str:
         "\t\t(property \"Part\" \"GRM155R61C104KA88D\"\n"
         "\t\t\t(at 0 0 0)\n"
         "\t\t)\n"
-        "\t\t(property \"Voltage\" \"0 VDC\"\n"
+        "\t\t(property \"Voltage Rating\" \"0 VDC\"\n"
         "\t\t\t(at 0 0 0)\n"
         "\t\t)\n"
         "\t\t(embedded_fonts no)\n"
