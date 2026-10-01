@@ -21,6 +21,7 @@ import requests
 from ..exceptions import ConfigurationError, PartNotFoundError, ProviderAPIError
 from ..models import ComponentData
 from ..ranges import parse_range
+from ..values import derive_value
 from .base import BaseProvider
 
 __all__ = ["DigiKeyProvider"]
@@ -225,6 +226,8 @@ class DigiKeyProvider(BaseProvider):
             mpn=mpn,
             manufacturer=str(manufacturer.get("Name", "")).strip(),
             description=str(product.get("Description", "")).strip(),
+            datasheet=str(product.get("Datasheet", "")).strip(),
+            value=derive_value(parameters),
             voltage_min=voltage[0],
             voltage_max=voltage[1],
             voltage_text=voltage[2],
@@ -232,8 +235,25 @@ class DigiKeyProvider(BaseProvider):
             temp_max=temperature[1],
             temp_text=temperature[2],
             package=str((product.get("Package") or {}).get("Name", "")).strip(),
+            digikey_url=product_url(product),
             raw_parameters=parameters,
         )
+
+
+def product_url(product: dict[str, Any]) -> str:
+    """Return the DigiKey product page URL exactly as the API supplied it.
+
+    No URL is synthesised. A hand-built URL is indistinguishable from a real one
+    in the symbol library, so a missing value is reported as missing rather than
+    filled with something that merely looks right.
+
+    Args:
+        product: The matched product record.
+
+    Returns:
+        The URL from the API, or ``""`` when the response omitted it.
+    """
+    return str(product.get("ProductUrl", "")).strip()
 
 
 def _build_bounds(

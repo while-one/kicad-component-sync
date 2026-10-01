@@ -25,18 +25,21 @@ __all__ = ["KiCadSymProcessor"]
 LOGGER = logging.getLogger(__name__)
 
 #: Fields this processor owns, following the project's Min/Max convention.
-#: ``Description`` is deliberately excluded: KiCad derives it and rewriting it
-#: forces a full symbol re-render in the editor.
-#: ``Voltage Rating`` is included as the fallback for parts that publish a
-#: single voltage rather than a range, so a lone value is never dropped.
+#: ``Reference``, ``Footprint`` and ``Part`` are never written: they are the
+#: designer's decisions, and ``Part`` is the lookup key itself.
 MANAGED_FIELDS = (
+    "Value",
+    "Manufacturer",
+    "Description",
+    "Datasheet",
+    "Package",
+    "Digikey",
     "Voltage Min",
     "Voltage Max",
     "Voltage Rating",
     "Temperature Min",
     "Temperature Max",
     "Operating Temperature",
-    "Package",
 )
 
 #: KiCad writes these fields at a zeroed position because they are hidden.
@@ -237,6 +240,7 @@ class KiCadSymProcessor(BaseProcessor):
 
         _ = existing
         return edits
+
 
     @staticmethod
     def _value_node(symbol: SList, name: str) -> SString | None:

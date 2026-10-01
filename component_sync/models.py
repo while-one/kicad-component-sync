@@ -43,6 +43,10 @@ class ComponentData:
         mpn: Manufacturer part number, used as the lookup key.
         manufacturer: Manufacturer name.
         description: Human readable part description.
+        datasheet: Datasheet URL or local filename as published by the vendor.
+        value: Display label for the ``Value`` field, for example ``100 pF``.
+            Left empty when the vendor publishes no quantity that determines a
+            label, so that an existing human-chosen value is never destroyed.
         voltage_min: Lower bound of the supply or working voltage.
         voltage_max: Upper bound of the supply or working voltage.
         voltage_text: Verbatim voltage string from the vendor, used only when a
@@ -52,6 +56,9 @@ class ComponentData:
         temp_text: Verbatim temperature string, used only when a single value or
             free text is returned and no bounds can be derived.
         package: Package or case designation.
+        digikey_url: Product page URL at DigiKey, exactly as returned by the
+            provider. Never synthesised, because a fabricated URL is
+            indistinguishable from a real one in the symbol library.
         raw_parameters: Every vendor parameter keyed by its normalised name.
             Values are preserved verbatim so that information which has no
             dedicated attribute above is never lost.
@@ -60,6 +67,8 @@ class ComponentData:
     mpn: str
     manufacturer: str = ""
     description: str = ""
+    datasheet: str = ""
+    value: str = ""
     voltage_min: str = ""
     voltage_max: str = ""
     voltage_text: str = ""
@@ -67,6 +76,7 @@ class ComponentData:
     temp_max: str = ""
     temp_text: str = ""
     package: str = ""
+    digikey_url: str = ""
     raw_parameters: dict[str, str] = field(default_factory=dict)
 
     @staticmethod
@@ -141,8 +151,13 @@ class ComponentData:
         mapping = {
             "Manufacturer": self.manufacturer,
             "Description": self.description,
+            "Datasheet": self.datasheet,
             "Package": self.package,
         }
+        if self.value:
+            mapping["Value"] = self.value
+        if self.digikey_url:
+            mapping["Digikey"] = self.digikey_url
         mapping.update(self.voltage_properties())
         mapping.update(self.temperature_properties())
         return {key: value for key, value in mapping.items() if value.strip()}
@@ -203,7 +218,7 @@ class ProcessResult:
 
     @property
     def modified_count(self) -> int:
-        """Return the number of fields whose value actually changed."""
+        """Return the number of fields whose value would change."""
         return sum(
             1 for change in self.changes if change.action is not ChangeAction.UNCHANGED
         )

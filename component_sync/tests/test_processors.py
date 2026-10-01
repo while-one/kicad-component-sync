@@ -311,16 +311,22 @@ class TestKiCadSymProcessor:
         assert '"Part" "GRM155R61C104KA88D"' in text
         assert "\r" not in text
 
-    def test_description_is_not_managed(
+    def test_description_is_compared_and_written(
         self, tmp_path: Path, kicad_sym_text: str
     ) -> None:
-        """Description is left alone even when the provider returns one."""
+        """Description is a normal user field and is compared like any other.
+
+        An earlier version excluded it on the mistaken assumption that KiCad
+        derives the field. It does not: it is typed by hand when the symbol is
+        created, so it belongs in the comparison set.
+        """
         path = tmp_path / "lib.kicad_sym"
         path.write_text(kicad_sym_text, encoding="utf-8")
 
-        KiCadSymProcessor(provider_with(**{CAP.mpn: CAP})).process(path)
+        result = KiCadSymProcessor(provider_with(**{CAP.mpn: CAP})).process(path)
 
-        assert "MLCC 0.1uF" not in path.read_text(encoding="utf-8")
+        assert '"Description" "MLCC 0.1uF"' in path.read_text(encoding="utf-8")
+        assert any(c.field_name == "Description" for c in result.changes)
 
     def test_symbol_without_part_is_skipped(
         self, tmp_path: Path, kicad_sym_text: str

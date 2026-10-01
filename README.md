@@ -118,20 +118,49 @@ ones appended.
 Field names follow the project's existing convention: ranges are written as
 discrete `Min`/`Max` pairs, never as one free-text field.
 
-| Source data | Written fields |
+| Written field | Source |
 | --- | --- |
-| `-55/+150 C`, `-55 C / +85 C`, `-40C to +150C` | `Temperature Min` = `-55 C`, `Temperature Max` = `+150 C` |
-| `2.65 V to 3.6 V`, `1.8V-5.5V` | `Voltage Min` = `2.65 V`, `Voltage Max` = `3.6 V` |
-| `16 VDC`, `50 VDC` (a single value) | `Voltage Rating` = `16 VDC` |
-| `85 C` (a single value) | `Operating Temperature` = `85 C` |
-| any | `Manufacturer`, `Package` |
+| `Value` | derived from the type parameter (see below) |
+| `Manufacturer`, `Description`, `Datasheet`, `Package` | vendor record |
+| `Digikey` | the product URL exactly as the API returned it |
+| `Temperature Min` / `Temperature Max` | a range such as `-55/+150 C` or `-55 C / +85 C` |
+| `Voltage Min` / `Voltage Max` | a range such as `2.65 V to 3.6 V` or `1.8V-5.5V` |
+| `Voltage Rating` | a lone voltage such as `16 VDC` |
+| `Operating Temperature` | a lone temperature such as `85 C` |
 
-A lone value is kept verbatim rather than being forced into a `Min` or `Max`
-that would misrepresent it. Both bounds are emitted **only** when the source
-actually contained two values.
+Never written: `Reference`, `Footprint` and `Part`. `Part` is the lookup key,
+and the first two are the designer's decisions.
 
-`Description` is never written: KiCad derives it, and rewriting it forces a full
-symbol re-render in the editor.
+A lone value is kept verbatim rather than forced into a `Min` or `Max` that
+would misrepresent it. Both bounds are emitted **only** when the source actually
+contained two values.
+
+### `Value` is derived, not invented
+
+`Value` is a human-readable label (`100 pF`, `10K`, `560 nH`, `16 MHz`), and
+those are exactly the quantities a distributor publishes as parameters:
+
+| Parameter present | Example input | Derived |
+| --- | --- | --- |
+| `Capacitance` | `0.1 uF` | `100 nF` |
+| `Resistance` | `10 kOhms`, `4.7 kOhms`, `0 Ohms` | `10K`, `4K7`, `0R` |
+| `Inductance` | `560 nH` | `560 nH` |
+| `Frequency` | `27.12 MHz` | `27.12 MHz` |
+
+When a part exposes none of those — an IC, connector or switch — **nothing is
+written** and the existing `Value` is left untouched. That is deliberate: those
+symbols conventionally carry the part number as their value, and overwriting it
+would destroy them.
+
+### URLs are never synthesised
+
+`Digikey` is written only when the API returns a `ProductUrl`. A hand-built URL
+would be indistinguishable from a real one in the library, so a missing value is
+reported as missing instead.
+
+There is deliberately **no `Mouser` handling**. This tool queries DigiKey and has
+no Mouser API, so it cannot produce a Mouser link and does not try. Existing
+Mouser links are preserved exactly as they are.
 
 ## Adding a provider
 
