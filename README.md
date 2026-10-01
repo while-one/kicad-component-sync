@@ -64,6 +64,25 @@ attention each change deserves:
 | `SAFE ADDS` | fills an empty field; nothing is lost if the value is wrong |
 | `UNRESOLVED` | parts that did not resolve, which need an action of their own |
 
+Within a group, changes are listed **per part** so a symbol's fields stay
+adjacent and its name is printed once:
+
+```
+NEEDS REVIEW  (5)
+  Description 1   Datasheet 1   Digikey 1   Voltage Rating 1   Temperature Max 1
+
+  ~ GRM21BC80J226ME51K
+        Description '' -> '22 µF ±20% 6.3V Ceramic Capacitor X6S 0805 (2012 Metric)'
+        Voltage Rating '10V' -> '6.3V'
+        Temperature Max '+85 C' -> '+105 C'
+```
+
+A part needing changes in two groups is listed in each, since the groups answer
+different questions. Long values are abbreviated by eliding the **middle**: two
+DigiKey URLs for one part share a long prefix and differ only in the trailing
+product identifier, so eliding the tail would render both sides as the same
+string and hide the change. `--width N` sets the limit.
+
 Field selection keeps a review focused. Filters are applied **before** any edit
 is planned, so a filtered field is never written even transiently:
 
@@ -316,7 +335,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 225 tests
+python -m pytest -q                     # 236 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

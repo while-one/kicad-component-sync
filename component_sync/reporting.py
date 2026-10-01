@@ -104,22 +104,30 @@ def default_palette(stream: TextIO | None = None, *, force: bool | None = None) 
 
 
 def _truncate(text: str, width: int) -> str:
-    """Shorten ``text`` to ``width`` characters, marking the elision.
+    """Shorten ``text`` to ``width`` characters by eliding its middle.
 
     Datasheet URLs from some manufacturers run past 250 characters, which
     destroys the alignment of every other column. The full value is still
     written to the library, so nothing is lost by abbreviating the report.
+
+    The middle is elided rather than the tail because the report's purpose is to
+    show what *changed*. Two DigiKey URLs for the same part share a long common
+    prefix and differ only in the trailing product identifier, so eliding the end
+    renders both sides as the same string and the change becomes invisible. The
+    head and tail together are what distinguish them.
 
     Args:
         text: The value to render.
         width: Maximum length before eliding.
 
     Returns:
-        The original text, or a shortened form ending in an ellipsis.
+        The original text, or a shortened form with an ellipsis in the middle.
     """
-    if len(text) <= width:
+    if len(text) <= width or width < 5:
         return text
-    return text[: max(width - 1, 0)] + "…"
+    keep = width - 1
+    head = keep // 2 + keep % 2
+    return f"{text[:head]}…{text[len(text) - (keep - head):]}"
 
 
 def _counts(changes: tuple[PropertyChange, ...]) -> dict[str, int]:
@@ -155,7 +163,7 @@ def _field_breakdown(palette: Palette, changes: tuple[PropertyChange, ...]) -> s
 
 
 def _format_change(palette: Palette, change: PropertyChange, width: int) -> str:
-    """Render one change as a single coloured line.
+    """Render one change as an indented field line.
 
     Args:
         palette: Colour helper.
@@ -163,16 +171,84 @@ def _format_change(palette: Palette, change: PropertyChange, width: int) -> str:
         width: Maximum width for each value.
 
     Returns:
-        A formatted line including its trailing newline.
+        A formatted line without its trailing newline.
     """
-    target = f"{change.identifier}"
     if change.action is ChangeAction.ADD:
         value = _truncate(change.new_value, width)
-        return f"  {palette(palette.ADD, '+')} {target}: {change.field_name} = {value!r}\n"
+        return f"        {palette(palette.DIM, change.field_name)} = {value!r}"
     old = _truncate(change.old_value or "", width)
     new = _truncate(change.new_value, width)
-    marker = palette(palette.OVERWRITE, "~")
-    return f"  {marker} {target}: {change.field_name} {old!r} -> {new!r}\n"
+    name = palette(palette.DIM, change.field_name)
+    return f"        {name} {old!r} -> {new!r}"
+
+
+def _format_group(
+    palette: Palette,
+    identifier: str,
+    changes: list[PropertyChange],
+    width: int,
+) -> list[str]:
+    """Render every change for one part as a single block.
+
+    A part usually needs several fields touched, and listing each as its own
+    top-level line separated by blank rows makes the reader reassemble which
+    changes belong together. Grouping by part keeps a part's fields adjacent and
+    lets the identifier be printed once.
+
+    Args:
+        palette: Colour helper.
+        identifier: The part or symbol name.
+        changes: Every change for this part, in report order.
+        width: Maximum width for each value.
+
+    Returns:
+        The lines of the block, without a trailing blank line.
+    """
+    marker = palette(palette.ADD, "+") if all(
+        change.action is ChangeAction.ADD for change in changes
+    ) else palette(palette.OVERWRITE, "~")
+    lines = [f"  {marker} {identifier}"]
+    lines.extend(_format_change(palette, change, width) for change in changes)
+    return lines
+
+
+def _format_section(
+    palette: Palette,
+    heading: str,
+    heading_code: str,
+    changes: tuple[PropertyChange, ...],
+    width: int,
+) -> list[str]:
+    """Render one report section, grouped by part.
+
+    A part that appears in more than one section is listed in each, since the
+    sections answer different questions and merging them would blur the risk
+    distinction the report is built on.
+
+    Args:
+        palette: Colour helper.
+        heading: The section title, already counting its changes.
+        heading_code: Colour code for the heading.
+        changes: The changes in this section.
+        width: Maximum width for each value.
+
+    Returns:
+        The lines of the section, ending with a blank separator.
+    """
+    lines = [palette(heading_code, heading)]
+    breakdown = _field_breakdown(palette, changes)
+    if breakdown:
+        lines.append(f"  {breakdown}")
+    lines.append("")
+
+    grouped: dict[str, list[PropertyChange]] = {}
+    for change in changes:
+        grouped.setdefault(change.identifier, []).append(change)
+
+    for identifier, group in grouped.items():
+        lines.extend(_format_group(palette, identifier, group, width))
+        lines.append("")
+    return lines
 
 
 def render_report(
@@ -214,28 +290,27 @@ def render_report(
     lines.append("")
 
     if overwrites:
-        lines.append(pal(pal.OVERWRITE, f"NEEDS REVIEW  ({len(overwrites)})"))
-        breakdown = _field_breakdown(pal, overwrites)
-        if breakdown:
-            lines.append(f"  {breakdown}")
-        lines.append("")
-        for change in overwrites:
-            lines.append(_format_change(pal, change, width))
+        lines.extend(
+            _format_section(
+                pal, f"NEEDS REVIEW  ({len(overwrites)})", pal.OVERWRITE, overwrites, width
+            )
+        )
 
     if values:
-        lines.append(pal(pal.HIGHLIGHT, f"VALUE CONVENTION  ({len(values)})"))
-        for change in values:
-            lines.append(_format_change(pal, change, width))
-        lines.append("")
+        lines.extend(
+            _format_section(
+                pal,
+                f"VALUE CONVENTION  ({len(values)})",
+                pal.HIGHLIGHT,
+                values,
+                width,
+            )
+        )
 
     if adds:
-        lines.append(pal(pal.ADD, f"SAFE ADDS  ({len(adds)})"))
-        breakdown = _field_breakdown(pal, adds)
-        if breakdown:
-            lines.append(f"  {breakdown}")
-        lines.append("")
-        for change in adds:
-            lines.append(_format_change(pal, change, width))
+        lines.extend(
+            _format_section(pal, f"SAFE ADDS  ({len(adds)})", pal.ADD, adds, width)
+        )
 
     if result.missing_parts:
         lines.append(pal(pal.WARN, f"UNRESOLVED  ({len(result.missing_parts)})"))

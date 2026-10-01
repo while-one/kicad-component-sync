@@ -9,7 +9,12 @@ import pytest
 
 from component_sync.models import ChangeAction, ProcessResult, PropertyChange
 from component_sync.processors.kicad_processor import KiCadSymProcessor
-from component_sync.reporting import Palette, default_palette, render_report
+from component_sync.reporting import (
+    Palette,
+    _truncate,
+    default_palette,
+    render_report,
+)
 from component_sync.selection import FieldSelection, split_field_list
 
 
@@ -201,7 +206,76 @@ class TestReportGrouping:
     def test_additions_are_labelled_as_additions(self) -> None:
         """An add is visually distinct from an overwrite."""
         out = self._plain()
-        assert "+ PART-1: Digikey = 'https://www.digikey.com/x'" in out
+        assert "  + PART-1" in out
+        assert "Digikey = 'https://www.digikey.com/x'" in out
+
+    def test_changes_are_grouped_under_one_identifier(self) -> None:
+        """A part needing several fields is printed as a single block."""
+        out = self._plain()
+        lines = out.splitlines()
+        header = next(i for i, line in enumerate(lines) if line == "  ~ PART-1")
+        # Two overwrites plus one value, but the header is printed once.
+        assert lines[header + 1].startswith("        Description ")
+        assert lines[header + 2].startswith("        Package ")
+        assert not any(
+            line.startswith("  ~ PART-1") for line in lines[header + 1 : header + 4]
+        )
+
+    def test_group_header_is_not_repeated_per_field(self) -> None:
+        """The identifier appears once per section, fields nest beneath it."""
+        out = self._plain()
+        lines = out.splitlines()
+        headers = [line for line in lines if line.startswith("  ~ PART-1")]
+        fields = [line for line in lines if line.startswith("        ")]
+        # One header per section the part appears in: NEEDS REVIEW and
+        # VALUE CONVENTION, and its two adds under SAFE ADDS.
+        assert len(headers) == 2
+        assert len(fields) == 5
+
+    def test_field_lines_are_indented_further(self) -> None:
+        """The nesting makes the grouping readable at a glance."""
+        assert "        Description " in self._plain()
+
+    def test_a_part_may_appear_in_several_sections(self) -> None:
+        """Sections stay independent, so a part is listed once in each."""
+        result = ProcessResult(
+            file_path="lib.kicad_sym",
+            changes=(
+                change("Description", "old", "new", identifier="P1"),
+                change("Value", "10K", "10 kOhm", identifier="P1"),
+                change("Digikey", None, "https://x", identifier="P1"),
+            ),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert out.count("  ~ P1") == 2, "once in NEEDS REVIEW, once in VALUE CONVENTION"
+        assert out.count("  + P1") == 1, "once in SAFE ADDS"
+
+    def test_groups_keep_first_appearance_order(self) -> None:
+        """Parts are listed in the order they were first proposed."""
+        result = ProcessResult(
+            file_path="lib.kicad_sym",
+            changes=(
+                change("Description", "a", "b", identifier="ZULU"),
+                change("Package", "c", "d", identifier="ALPHA"),
+                change("Datasheet", "", "e", identifier="ZULU"),
+            ),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert out.index("ZULU") < out.index("ALPHA")
+
+    def test_a_part_with_only_additions_gets_an_add_marker(self) -> None:
+        """The header marker reflects the group's action, not a per-line one."""
+        result = ProcessResult(
+            file_path="lib.kicad_sym",
+            changes=(
+                change("Digikey", None, "https://x", identifier="P1"),
+                change("Package", None, "0402", identifier="P1"),
+            ),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert "  + P1" in out
+        assert "  ~ P1" not in out
+
 
     def test_unresolved_explains_itself(self) -> None:
         """The miss list tells the author what to do about it."""
@@ -239,6 +313,48 @@ class TestReportGrouping:
         assert "filters" in out
         assert "skip" in out
 
+
+class TestMiddleElision:
+    """Long values must still show what changed.
+
+    Two DigiKey URLs for the same part share a long prefix and differ only in the
+    trailing product identifier. Eliding the tail rendered both sides as the same
+    string, so the change was invisible in the report.
+    """
+
+    def test_url_change_is_visible(self) -> None:
+        """The differing tail survives abbreviation."""
+        old = "https://www.digikey.com/en/products/detail/murata-electronics/GCM155/12345"
+        new = "https://www.digikey.com/en/products/detail/murata-electronics/GCM155/99999"
+        result = ProcessResult(
+            file_path="lib",
+            changes=(change("Digikey", old, new, identifier="GCM155"),),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert "12345" in out
+        assert "99999" in out
+
+    def test_head_and_tail_are_kept(self) -> None:
+        """The host and the product identifier both survive."""
+        text = "https://www.digikey.com/en/products/detail/x/" + "y" * 200
+        short = _truncate(text, 40)
+        assert len(short) <= 40
+        assert short.startswith("https://www.digikey")
+        assert "…" in short
+        assert short.endswith("y")
+
+    def test_short_values_are_untouched(self) -> None:
+        """Only overlong values are abbreviated."""
+        assert _truncate("50V", 60) == "50V"
+
+    def test_exact_boundary_is_untouched(self) -> None:
+        """A value exactly at the limit is not abbreviated."""
+        text = "x" * 40
+        assert _truncate(text, 40) == text
+
+    def test_narrow_width_does_not_crash(self) -> None:
+        """A tiny width degrades to returning the text rather than misbehaving."""
+        assert _truncate("abcdefgh", 3) == "abcdefgh"
 
 class TestColour:
     """Verify colour is emitted only where it is wanted."""
