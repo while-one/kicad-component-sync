@@ -328,6 +328,76 @@ parts, because the two call for opposite responses:
 A per-part provider fault no longer aborts the run, so one bad part does not
 throw away the results for the other 56.
 
+## Providers: data and sourcing are different things
+
+Distributors are not interchangeable, and a single `--provider` choice between
+them wrongly implies they are. Two roles exist:
+
+| Role | Contributes | Providers |
+| --- | --- | --- |
+| **data** | component values: `Value`, voltage and temperature bounds, `Package`, `Manufacturer`, `Description`, `Datasheet` | DigiKey |
+| **source** | purchasing links only | Mouser |
+
+`--provider` offers **data** providers only. Sourcing providers run in sequence
+*after* the data provider, and are skipped automatically when unconfigured, so
+having `MOUSER_API_KEY` set is enough to enable the Mouser pass. `--no-source`
+turns it off.
+
+### Why Mouser cannot be a data provider
+
+Its Search API publishes **no parametric data at all**. The only two
+`ProductAttributes` names that appear on any part — across every search endpoint
+in both API versions — are `Packaging` and `Standard Pack Qty`. There is no
+`Resistance`, `Capacitance`, `Inductance`, `Frequency`, `Voltage` or
+`Operating Temperature`, and no product-detail endpoint exists that exposes more.
+
+The words do appear in the response, but only as prose inside `Description` and
+`Category` ("Thick Film Resistors - SMD"). Parsing a value out of a sentence is
+exactly the kind of guess that produced the `1e400 → 1 F` and `36k5` errors
+earlier, so it is not done.
+
+### Sourcing links are added, never substituted
+
+A sourcing provider may only **add** a link. If the file already holds a value
+for that field, the link is dropped: **46 of the 57** existing `Mouser` values in
+this library are `mou.sr` short links to a different reseller, and those are the
+author's curation, not an error to correct. The rule is scoped to contributed
+links specifically, so it never blocks the data provider from fixing a genuinely
+wrong `Value`.
+
+Two further rules keep a wrong link from being written:
+
+- **URLs are used exactly as returned.** Mouser returns a URL carrying the locale
+  of the *API account* rather than of the reader, plus a `?qs=` tracking
+  parameter. Rewriting it would mean constructing a URL, and a fabricated URL is
+  indistinguishable from a real one in a symbol library.
+- **An ambiguous part number is refused, not guessed.** Manufacturer part numbers
+  are unique only within a manufacturer, so a short or numeric number can match
+  unrelated products. Mouser returns **six** products all numbered `1028`: side
+  cutting pliers, conduit fittings, an eInk display, a battery holder, punches
+  and a printer shaft. The `Manufacturer` already in the file disambiguates it;
+  where that fails, the ambiguity is reported. Taking the first result would
+  attach a link to *pliers* to a battery-holder symbol.
+
+Distributor naming of the same manufacturer also differs ("Murata" versus
+"Murata Electronics", "YAGEO" versus "Yageo"), so the hint is compared after
+stripping case and punctuation, accepting a division as its parent. This is
+string comparison, not a vendor table, so it has limits: `C&K` and `C and K` are
+not recognised as the same company, and such a part stays reported as ambiguous,
+which is the safe direction to fail in.
+
+### Two Mouser behaviours a naive client gets wrong
+
+- A rejected API key returns **HTTP 200** with `Errors` populated. Checking
+  `status_code` alone reads a rejected key as success.
+- A part Mouser cannot find is **silently dropped** from a batch, with an empty
+  `Errors` array. A miss is only detectable by comparing the requested part
+  numbers against those returned.
+
+In this library the sourcing pass currently proposes **no** changes: all 57
+symbols that have a `Part` already carry a `Mouser` link. It earns its place for
+new symbols and parts added later.
+
 ## Adding a provider
 
 ```python
@@ -364,7 +434,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 250 tests
+python -m pytest -q                     # 292 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

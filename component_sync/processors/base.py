@@ -91,18 +91,22 @@ class BaseProcessor(ABC):
         fields: FieldSelection | None = None,
         colour: bool | None = None,
         width: int = 60,
+        sources: tuple[BaseProvider, ...] = (),
     ) -> None:
         """Initialise the processor.
 
         Args:
-            provider: Provider used to resolve part numbers.
+            provider: Data provider, consulted for component values.
             dry_run: When true, no file on disk is modified.
             fields: Restricts which fields may change; unrestricted by default.
             colour: Force colour on or off, or ``None`` to detect from the
                 destination stream.
             width: Maximum width for each value rendered in the report.
+            sources: Sourcing providers, consulted after the data provider and
+                contributing purchasing links only.
         """
         self.provider = provider
+        self.sources = sources
         self.dry_run = dry_run
         self.cache = LookupCache()
         self.fields = fields if fields is not None else FieldSelection()
@@ -164,6 +168,48 @@ class BaseProcessor(ABC):
             Component data, or ``None`` when the provider has no match.
         """
         return self.cache.fetch(self.provider, mpn)
+
+    def _desired(
+        self, mpn: str, existing: dict[str, str]
+    ) -> tuple[dict[str, str] | None, str]:
+        """Return every field this run would like to set for one part number.
+
+        The data provider is consulted first, because it decides what the
+        component *is*. Each sourcing provider then contributes its own links.
+
+        A sourcing provider may only **add** a link: if the file already holds a
+        value for that field, its link is dropped. In this library 46 of the 57
+        existing ``Mouser`` values are ``mou.sr`` short links to a different
+        reseller, and those are the author's curation, not an error to correct.
+        The rule is scoped to contributed links precisely so it does not block
+        the data provider from correcting a genuinely wrong value.
+
+        Args:
+            mpn: The manufacturer part number to resolve.
+            existing: Fields currently present on the component.
+
+        Returns:
+            A ``(properties, reason)`` pair. ``properties`` is ``None`` when the
+            data provider could not resolve the part; ``reason`` is non-empty
+            only for a provider fault.
+        """
+        data, reason = self._try_resolve(mpn)
+        if data is None:
+            return None, reason
+
+        properties = data.as_properties()
+        for source in self.sources:
+            manufacturer = existing.get("Manufacturer", "").strip()
+            try:
+                links = self.cache.fetch_links(source, mpn, manufacturer)
+            except ComponentSyncError as exc:
+                LOGGER.info("Sourcing lookup failed for %r at %s: %s", mpn, source.name, exc)
+                continue
+            for name, url in links.items():
+                if existing.get(name, "").strip():
+                    continue
+                properties[name] = url
+        return properties, ""
 
     def _try_resolve(self, mpn: str) -> tuple[ComponentData | None, str]:
         """Resolve one MPN, converting a provider fault into a reportable note.

@@ -1,0 +1,356 @@
+"""Sourcing provider for Mouser Electronics.
+
+Mouser is a **sourcing** provider, not a data provider. Its Search API returns
+manufacturer, description, datasheet URL and a product link, but its
+``ProductAttributes`` list only ever contains ``Packaging`` and
+``Standard Pack Qty``. No ``Resistance``, ``Capacitance``, ``Inductance``,
+``Frequency``, ``Voltage`` or ``Operating Temperature`` was observed on any part
+examined, across every search endpoint the API exposes. So this provider
+contributes exactly one thing: where to buy the part.
+
+Two behaviours of the API shape this module:
+
+- **The key is a query parameter, not a header.** It appears as ``?apiKey=``.
+- **Errors arrive as HTTP 200.** A rejected key returns ``200`` with
+  ``Errors`` populated rather than a 4xx status, so checking ``status_code``
+  alone would read a rejected key as success. A batch also silently drops a part
+  it cannot find, reporting no error at all, so a miss is detected by
+  comparing the requested part numbers against those returned.
+
+The product URL is written exactly as returned. It carries the locale of the API
+account rather than of the reader, and a ``?qs=`` tracking parameter, but
+rewriting it would mean constructing a URL, and a fabricated URL is
+indistinguishable from a real one in a symbol library.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+from typing import Any
+
+import requests
+
+from ..exceptions import (
+    AmbiguousPartError,
+    ConfigurationError,
+    PartNotFoundError,
+    ProviderAPIError,
+)
+from ..models import ComponentData
+from .base import BaseProvider, ProviderRole
+
+__all__ = ["MouserProvider"]
+
+LOGGER = logging.getLogger(__name__)
+
+SEARCH_URL = "https://api.mouser.com/api/v1/search/partnumber"
+DEFAULT_TIMEOUT = 30.0
+
+#: Field the contributed link is written into.
+#:
+#: The library already uses ``Mouser`` for this, so the existing field name is
+#: kept rather than introducing a second one.
+LINK_FIELD = "Mouser"
+
+#: Most part numbers Mouser accepts in one request, joined by ``|``.
+MAX_PARTS_PER_REQUEST = 10
+
+
+class MouserProvider(BaseProvider):
+    """Contribute a Mouser purchasing link for a manufacturer part number.
+
+    Attributes:
+        name: Registry key for this provider.
+        role: Always :attr:`~component_sync.providers.base.ProviderRole.SOURCE`.
+        api_key: The Search API key.
+        timeout: Per-request timeout in seconds.
+    """
+
+    name = "mouser"
+    role = ProviderRole.SOURCE
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        session: requests.Session | None = None,
+    ) -> None:
+        """Initialise the provider.
+
+        The key falls back to the ``MOUSER_API_KEY`` environment variable, which
+        is how the sourcing pass is enabled implicitly.
+
+        Args:
+            api_key: Mouser Search API key, or ``None`` to read the environment.
+            timeout: Per-request timeout in seconds.
+            session: Optional pre-built session, primarily for tests.
+        """
+        self.api_key = api_key or os.environ.get("MOUSER_API_KEY", "")
+        self.timeout = timeout
+        self._session = session if session is not None else requests.Session()
+        self._owns_session = session is None
+
+    def authenticate(self) -> None:
+        """Validate that an API key is configured.
+
+        Mouser requires no token exchange; the key is sent with every request.
+
+        Raises:
+            ConfigurationError: If no API key is available.
+        """
+        if not self.api_key:
+            raise ConfigurationError(
+                "Mouser API key is missing. Set MOUSER_API_KEY, or pass api_key=."
+            )
+
+    def fetch_component_data(self, mpn: str) -> ComponentData:
+        """Return the Mouser link for one manufacturer part number.
+
+        Args:
+            mpn: The manufacturer part number to look up.
+
+        Returns:
+            A record carrying only the Mouser link.
+
+        Raises:
+            PartNotFoundError: If Mouser does not stock the part.
+            ProviderAPIError: If the request fails or the API reports an error.
+        """
+        self.authenticate()
+        matches = self._exact_matches(mpn)
+        if not matches:
+            raise PartNotFoundError(mpn)
+        return ComponentData(mpn=mpn, source_links={LINK_FIELD: product_url(matches[0])})
+
+    def fetch_source_links(self, mpn: str, manufacturer: str = "") -> dict[str, str]:
+        """Return the Mouser link, using the manufacturer to identify the part.
+
+        Args:
+            mpn: The manufacturer part number to look up.
+            manufacturer: The manufacturer as recorded in the file. This is what
+                makes a short or numeric part number resolvable, because such a
+                number is unique only within a manufacturer.
+
+        Returns:
+            Mapping of field name to URL.
+
+        Raises:
+            PartNotFoundError: If Mouser does not stock the part.
+            AmbiguousPartError: If the number still matches several products.
+            ProviderAPIError: If the request fails or the API reports an error.
+        """
+        self.authenticate()
+        matches = self._exact_matches(mpn)
+        if not matches:
+            raise PartNotFoundError(mpn)
+
+        if len(matches) == 1:
+            return {LINK_FIELD: product_url(matches[0])}
+
+        chosen = _pick_by_manufacturer(matches, manufacturer) if manufacturer else None
+        if chosen is not None:
+            LOGGER.debug(
+                "Disambiguated %r to %r using manufacturer %r",
+                mpn,
+                chosen.get("Manufacturer"),
+                manufacturer,
+            )
+            return {LINK_FIELD: product_url(chosen)}
+
+        raise AmbiguousPartError(
+            mpn, tuple(_describe(part) for part in matches)
+        )
+
+    def close(self) -> None:
+        """Release any network resources held by this provider."""
+        if self._owns_session:
+            self._session.close()
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+    def _exact_matches(self, mpn: str) -> list[dict[str, Any]]:
+        """Return every product whose manufacturer part number equals ``mpn``.
+
+        More than one result is normal rather than exceptional. Manufacturer part
+        numbers are unique only within a manufacturer, so a short or numeric
+        number legitimately matches unrelated products from different suppliers
+        of that number.
+
+        Args:
+            mpn: The manufacturer part number to look up.
+
+        Returns:
+            Every exactly matching product record.
+
+        Raises:
+            ProviderAPIError: On a transport failure, a non-200 response, a
+                malformed body, or an error the API reported.
+        """
+        body = {
+            "SearchByPartRequest": {
+                "mouserPartNumber": mpn,
+                "partSearchOptions": "Exact",
+            }
+        }
+        try:
+            response = self._session.post(
+                f"{SEARCH_URL}?apiKey={self.api_key}",
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                json=body,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ProviderAPIError(f"Mouser search failed for {mpn!r}: {exc}") from exc
+
+        if response.status_code != 200:
+            raise ProviderAPIError(
+                f"Mouser search for {mpn!r} failed with HTTP "
+                f"{response.status_code}: {_summarise(response)}"
+            )
+        try:
+            payload: dict[str, Any] = response.json()
+        except ValueError as exc:
+            raise ProviderAPIError(f"Malformed Mouser response for {mpn!r}: {exc}") from exc
+
+        errors = payload.get("Errors") or []
+        if errors:
+            # A refused key arrives as HTTP 200, so the body is the only signal.
+            messages = "; ".join(
+                str(error.get("Message", "")) for error in errors if isinstance(error, dict)
+            )
+            raise ProviderAPIError(
+                f"Mouser rejected the request for {mpn!r}: {messages or 'unspecified error'}"
+            )
+
+        wanted = mpn.strip().casefold()
+        return [
+            part
+            for part in (payload.get("SearchResults") or {}).get("Parts") or []
+            if str(part.get("ManufacturerPartNumber", "")).strip().casefold() == wanted
+        ]
+
+
+def _normalise_manufacturer(name: str) -> str:
+    """Reduce a manufacturer name to comparable letters.
+
+    Distributors do not spell a manufacturer the same way. DigiKey says
+    ``"Murata Electronics"`` where Mouser says ``"Murata"``, and ``"YAGEO"`` where
+    the other says ``"Yageo"``. Stripping case, spaces and punctuation lets those
+    be compared without a lookup table of every vendor's naming habits.
+
+    Args:
+        name: A manufacturer name as either distributor wrote it.
+
+    Returns:
+        The name lowercased with non-alphanumeric characters removed.
+    """
+    return re.sub(r"[^a-z0-9]", "", name.strip().casefold())
+
+
+def _same_manufacturer(left: str, right: str) -> bool:
+    """Return whether two distributor spellings name the same manufacturer.
+
+    Compares normalised forms, accepting a containment match so that a shorter
+    name matches a longer one that merely elaborates it, and a shared prefix of
+    at least five characters for names that differ by a corporate suffix such as
+    ``"Texas Instruments"`` against ``"Texas Instruments Inc"``.
+
+    Args:
+        left: One manufacturer name.
+        right: The other manufacturer name.
+
+    Returns:
+        True when the two are judged to be the same manufacturer.
+    """
+    a, b = _normalise_manufacturer(left), _normalise_manufacturer(right)
+    if not a or not b:
+        return False
+    if a == b or a in b or b in a:
+        return True
+    shared = 0
+    for first, second in zip(a, b, strict=False):
+        if first != second:
+            break
+        shared += 1
+    return shared >= 5
+
+
+def _pick_by_manufacturer(
+    matches: list[dict[str, Any]], manufacturer: str
+) -> dict[str, Any] | None:
+    """Return the single match made by ``manufacturer``, if there is exactly one.
+
+    Args:
+        matches: Every product claiming the part number.
+        manufacturer: The manufacturer as recorded in the file.
+
+    Returns:
+        The matching product, or ``None`` when zero or several match.
+    """
+    hits = [
+        part
+        for part in matches
+        if _same_manufacturer(_manufacturer_of(part), manufacturer)
+    ]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _manufacturer_of(part: dict[str, Any]) -> str:
+    """Return the manufacturer name of a product record.
+
+    Args:
+        part: A product record from the search response.
+
+    Returns:
+        The manufacturer name, or ``""`` when the record carried none.
+    """
+    return str(part.get("Manufacturer") or part.get("ActualMfrName") or "").strip()
+
+
+def _describe(part: dict[str, Any]) -> str:
+    """Return a short ``"manufacturer: description"`` line for a candidate.
+
+    Args:
+        part: A product record from the search response.
+
+    Returns:
+        A one line description naming the manufacturer and the product.
+    """
+    description = " ".join(str(part.get("Description") or "").split())[:48]
+    return f"{_manufacturer_of(part) or 'unknown'}: {description}"
+
+
+def _summarise(response: requests.Response) -> str:
+    """Return a readable one line description of a failed response.
+
+    Args:
+        response: The failed response.
+
+    Returns:
+        A single line naming the status and any reason the body gave.
+    """
+    try:
+        payload = response.json()
+    except ValueError:
+        return " ".join(response.text.split())[:160] or f"HTTP {response.status_code}"
+    if isinstance(payload, dict):  # pragma: no cover - defensive
+        for key in ("message", "Message", "detail"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return f"HTTP {response.status_code}: {' '.join(value.split())}"
+    return f"HTTP {response.status_code}"
+
+
+def product_url(part: dict[str, Any]) -> str:
+    """Return the Mouser product page URL exactly as the API supplied it.
+
+    Args:
+        part: A product record from the search response.
+
+    Returns:
+        The URL, or ``""`` when the record carried none.
+    """
+    return str(part.get("ProductDetailUrl", "")).strip()

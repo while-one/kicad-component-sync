@@ -59,6 +59,10 @@ class ComponentData:
         digikey_url: Product page URL at DigiKey, exactly as returned by the
             provider. Never synthesised, because a fabricated URL is
             indistinguishable from a real one in the symbol library.
+        source_links: Purchasing links keyed by the field they belong in, for
+            example ``{"Mouser": "https://..."}``. Kept apart from the
+            attributes above because a sourcing provider may only add a link, so
+            a link can never be confused with a value.
         raw_parameters: Every vendor parameter keyed by its normalised name.
             Values are preserved verbatim so that information which has no
             dedicated attribute above is never lost.
@@ -77,6 +81,7 @@ class ComponentData:
     temp_text: str = ""
     package: str = ""
     digikey_url: str = ""
+    source_links: dict[str, str] = field(default_factory=dict)
     raw_parameters: dict[str, str] = field(default_factory=dict)
 
     @staticmethod
@@ -137,6 +142,19 @@ class ComponentData:
         if self.temp_text:
             return {"Operating Temperature": self.temp_text}
         return {}
+
+    def source_properties(self) -> dict[str, str]:
+        """Return the purchasing links a sourcing provider contributed.
+
+        These are deliberately excluded from :meth:`as_properties`. A data
+        provider decides what a component *is*; a sourcing provider only says
+        where it can be bought, and keeping the two apart means a link can never
+        be mistaken for a value.
+
+        Returns:
+            Mapping of field name to URL, omitting empty values.
+        """
+        return {name: url for name, url in self.source_links.items() if url.strip()}
 
     def as_properties(self) -> dict[str, str]:
         """Return every non-empty field as a KiCad property mapping.

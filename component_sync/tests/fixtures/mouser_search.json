@@ -1,0 +1,121 @@
+{
+ "RC0402FR-0710KL": {
+  "_errors": [],
+  "_results": 1,
+  "_parts": [
+   {
+    "ManufacturerPartNumber": "RC0402FR-0710KL",
+    "MouserPartNumber": "603-RC0402FR-0710KL",
+    "Manufacturer": "YAGEO",
+    "Description": "Thick Film Resistors - SMD General Purpose Chip Resistor 0402, 10kOhms, 1%, 1/16W",
+    "DataSheetUrl": "https://www.mouser.com/catalog/specsheets/YAGEO_PYu_RC_Group_51_RoHS_L_12.pdf",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/YAGEO/RC0402FR-0710KL?qs=I1mnnYJTTsxUoNwrUsQExA%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant By Exemption"
+   }
+  ]
+ },
+ "GRM155R61C104KA88D": {
+  "_errors": [],
+  "_results": 1,
+  "_parts": [
+   {
+    "ManufacturerPartNumber": "GRM155R61C104KA88D",
+    "MouserPartNumber": "81-GRM155R61C104KA8D",
+    "Manufacturer": "Murata Electronics",
+    "Description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.1 uF 16 VDC 10% 0402 X5R",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Murata-Electronics/GRM155R61C104KA88D?qs=u8huD7HxK6Yq%2F35xaaJLWg%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant"
+   }
+  ]
+ },
+ "1028": {
+  "_errors": [],
+  "_results": 6,
+  "_parts": [
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "624-1028",
+    "Manufacturer": "Sargent Tools",
+    "Description": "Pliers & Tweezers SIDE CUTTING PLIER",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/332/1/Sargent_Tools_Catalog_2021_rev_2.pdf",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Sargent-Tools/1028?qs=uRnagMugFMePtjVUMyjzbw%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "Not Applicable"
+   },
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "836-1028",
+    "Manufacturer": "Heyco",
+    "Description": "Conduit Fittings & Accessories HFB 1/2 GRAY",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Heyco/1028?qs=%2FVXojVtLN%252B88E0s6ejRmaA%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant"
+   },
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "485-1028",
+    "Manufacturer": "Adafruit",
+    "Description": "Display Development Tools Adafruit 2.9 Red/Black/White eInk Display Breakout - THINK INK - SSD1680 Chipset",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Adafruit/1028?qs=xZ%2FP%252Ba9zWqbZxSLWz2GiEQ%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant"
+   },
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "534-1028",
+    "Manufacturer": "Keystone Electronics",
+    "Description": "Cylindrical Battery Contacts, Clips, Holders & Springs Battery HOLDER PC AA",
+    "DataSheetUrl": "https://www.mouser.com/datasheet/3/201/1/1028.pdf",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Keystone-Electronics/1028?qs=TMDrOSIpnUdoTBwO9TubhA%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant"
+   },
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "N/A",
+    "Manufacturer": "Greenlee",
+    "Description": "Punches & Dies PISTON, PUMP",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Greenlee/1028?qs=0lSvoLzn4L%252BtOE9edb41QQ%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": ""
+   },
+   {
+    "ManufacturerPartNumber": "1028",
+    "MouserPartNumber": "76-1028",
+    "Manufacturer": "MakerBot",
+    "Description": "3D Printing Accessories Z-Linear Shaft",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/MakerBot/1028?qs=HFfMDpzxxd0r84aLDM09Jw%3D%3D",
+    "LifecycleStatus": "Obsolete",
+    "ROHSStatus": ""
+   }
+  ]
+ },
+ "ZZZ-NOT-REAL-999": {
+  "_errors": [],
+  "_results": 0,
+  "_parts": []
+ },
+ "TXS0108EPWR": {
+  "_errors": [],
+  "_results": 1,
+  "_parts": [
+   {
+    "ManufacturerPartNumber": "TXS0108EPWR",
+    "MouserPartNumber": "595-TXS0108EPWR",
+    "Manufacturer": "Texas Instruments",
+    "Description": "Translation - Voltage Levels 8B Bidir Vltg-Level Translator A 595-TXS A 595-TXS0108EPWRG4",
+    "DataSheetUrl": "",
+    "ProductDetailUrl": "https://www.mouser.pl/en/ProductDetail/Texas-Instruments/TXS0108EPWR?qs=IUbkBnfnSQLgiWtCbWtYOw%3D%3D",
+    "LifecycleStatus": null,
+    "ROHSStatus": "RoHS Compliant"
+   }
+  ]
+ }
+}

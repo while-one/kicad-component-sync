@@ -96,6 +96,7 @@ class LookupCache:
 
     _values: dict[tuple[BaseProvider, str], ComponentData] = field(default_factory=dict)
     _missing: set[tuple[BaseProvider, str]] = field(default_factory=set)
+    _links: dict[tuple[BaseProvider, str], dict[str, str]] = field(default_factory=dict)
     _stats: CacheStats = field(default_factory=CacheStats)
 
     @staticmethod
@@ -114,6 +115,50 @@ class LookupCache:
             The provider, used as a dictionary key.
         """
         return provider
+
+    def fetch_links(
+        self, provider: BaseProvider, mpn: str, manufacturer: str = ""
+    ) -> dict[str, str]:
+        """Return purchasing links for ``mpn``, consulting the provider once.
+
+        Links are cached separately from component data because they are keyed
+        on the manufacturer as well as the part number: the same number can
+        resolve to different products at different suppliers, so a cached link
+        for one manufacturer must not be served for another.
+
+        Args:
+            provider: Sourcing provider to query on a cache miss.
+            mpn: The manufacturer part number.
+            manufacturer: Manufacturer as recorded in the file, used to
+                disambiguate an otherwise ambiguous number.
+
+        Returns:
+            Mapping of field name to URL, empty when the provider has no match.
+
+        Raises:
+            ComponentSyncError: Any provider failure, which is never cached.
+        """
+        key = (self._provider_key(provider), normalise_mpn(f"{manufacturer}|{mpn}"))
+
+        if key in self._links:
+            self._bump(hits=self._stats.hits)
+            return dict(self._links[key])
+
+        try:
+            links = provider.fetch_source_links(mpn, manufacturer)
+        except PartNotFoundError:
+            # A miss is remembered, and a remembered miss must stay empty rather
+            # than being confused with a lookup that was never attempted.
+            self._links[key] = {}
+            self._bump(misses=1)
+            return {}
+        except BaseException:
+            self._bump(failures=1)
+            raise
+
+        self._links[key] = dict(links)
+        self._bump(misses=1)
+        return dict(links)
 
     def fetch(self, provider: BaseProvider, mpn: str) -> ComponentData | None:
         """Return data for ``mpn``, consulting the provider at most once.
@@ -188,6 +233,7 @@ class LookupCache:
         """Discard all cached entries and reset the counters."""
         self._values.clear()
         self._missing.clear()
+        self._links.clear()
         self._stats = CacheStats()
 
 

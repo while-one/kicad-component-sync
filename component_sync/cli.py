@@ -11,13 +11,14 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
+from contextlib import ExitStack
 from pathlib import Path
 
 from .exceptions import ComponentSyncError, RateLimitError
 from .processors.base import BaseProcessor
 from .processors.csv_processor import CSVProcessor
 from .processors.kicad_processor import KiCadSymProcessor
-from .providers.base import BaseProvider
+from .providers.base import BaseProvider, ProviderRole
 from .providers.factory import ProviderFactory
 from .selection import FieldSelection
 
@@ -76,8 +77,20 @@ def build_parser() -> argparse.ArgumentParser:
         "-p",
         "--provider",
         default="digikey",
-        choices=ProviderFactory.available(),
-        help="Distributor to query (default: digikey).",
+        choices=ProviderFactory.available(ProviderRole.DATA),
+        help=(
+            "Data provider to query for component values (default: digikey). "
+            "Sourcing providers are not offered here; they run in sequence."
+        ),
+    )
+    parser.add_argument(
+        "--no-source",
+        action="store_true",
+        help=(
+            "Skip the sourcing pass. By default every configured sourcing "
+            "provider is consulted after the data provider to add purchasing "
+            "links."
+        ),
     )
     parser.add_argument(
         "-n",
@@ -143,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _build_provider(args: argparse.Namespace) -> BaseProvider:
-    """Construct the provider selected on the command line.
+    """Construct the data provider selected on the command line.
 
     Args:
         args: Parsed command line arguments.
@@ -157,6 +170,34 @@ def _build_provider(args: argparse.Namespace) -> BaseProvider:
     if args.client_secret:
         overrides["client_secret"] = args.client_secret
     return ProviderFactory.create(args.provider, **overrides)
+
+
+def _build_sources(args: argparse.Namespace) -> tuple[BaseProvider, ...]:
+    """Construct the sourcing providers to run after the data provider.
+
+    Every registered sourcing provider is used. One that has no credentials is
+    skipped with a note rather than being treated as an error, so a run does not
+    fail because an optional distributor was never configured.
+
+    Args:
+        args: Parsed command line arguments.
+
+    Returns:
+        The configured sourcing providers, in registration order.
+    """
+    if args.no_source:
+        return ()
+    sources: list[BaseProvider] = []
+    for name in ProviderFactory.available(ProviderRole.SOURCE):
+        provider = ProviderFactory.create(name)
+        try:
+            provider.authenticate()
+        except ComponentSyncError as exc:
+            LOGGER.info("Skipping sourcing provider %s: %s", name, exc.message)
+            provider.close()
+            continue
+        sources.append(provider)
+    return tuple(sources)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -181,19 +222,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         provider = _build_provider(args)
+        sources = _build_sources(args)
         processor_class = select_processor(input_file)
         selection = FieldSelection.build(
             only=args.only,
             skip=args.skip,
             ignore_case=args.ignore_case,
         )
-        with provider:
+        with ExitStack() as stack:
+            stack.enter_context(provider)
+            for source in sources:
+                stack.enter_context(source)
             processor = processor_class(
                 provider,
                 dry_run=args.dry_run,
                 fields=selection,
                 colour=False if args.no_color else None,
                 width=args.width,
+                sources=sources,
             )
             result = processor.process(input_file)
     except ComponentSyncError as exc:

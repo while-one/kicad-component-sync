@@ -34,6 +34,7 @@ MANAGED_FIELDS = (
     "Datasheet",
     "Package",
     "Digikey",
+    "Mouser",
     "Voltage Min",
     "Voltage Max",
     "Voltage Rating",
@@ -117,20 +118,16 @@ class KiCadSymProcessor(BaseProcessor):
             mpn = mpn.strip()
             seen.add(mpn)
 
-            data, reason = self._try_resolve(mpn)
-            if data is None:
+            existing = self._properties(symbol)
+            wanted, reason = self._desired(mpn, existing)
+            if wanted is None:
                 if reason:
                     failed.append((mpn, reason))
                 elif mpn not in missing:
                     missing.append(mpn)
                 continue
 
-            desired = {
-                name: value
-                for name, value in data.as_properties().items()
-                if name in MANAGED_FIELDS
-            }
-            existing = self._properties(symbol)
+            desired = {name: value for name, value in wanted.items() if name in MANAGED_FIELDS}
             row_changes = self._classify(symbol_name, existing, desired)
             changes.extend(row_changes)
 

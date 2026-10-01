@@ -3,10 +3,31 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from ..models import ComponentData
 
-__all__ = ["BaseProvider"]
+__all__ = ["BaseProvider", "ProviderRole"]
+
+
+class ProviderRole(Enum):
+    """What a provider is consulted for.
+
+    Distributors are not interchangeable, and offering a single
+    ``--provider`` choice between them implies they are. They are not: only some
+    publish the parametric values a symbol needs.
+
+    Attributes:
+        DATA: Supplies component values: ``Value``, voltage and temperature
+            bounds, package, manufacturer and description. This is the only
+            kind of provider that may change those fields.
+        SOURCE: Supplies purchasing links. A sourcing provider may only add a
+            link the author does not already have; it can never contribute a
+            value, and its absence leaves the symbol otherwise untouched.
+    """
+
+    DATA = "data"
+    SOURCE = "source"
 
 
 class BaseProvider(ABC):
@@ -20,9 +41,11 @@ class BaseProvider(ABC):
 
     Attributes:
         name: Registry key for this provider, for example ``"digikey"``.
+        role: What this provider is consulted for.
     """
 
     name: str = "base"
+    role: ProviderRole = ProviderRole.DATA
 
     @abstractmethod
     def authenticate(self) -> None:
@@ -52,6 +75,38 @@ class BaseProvider(ABC):
             ProviderAPIError: If the lookup fails for any other reason.
         """
         raise NotImplementedError
+
+    def fetch_source_links(
+        self, mpn: str, manufacturer: str = ""
+    ) -> dict[str, str]:
+        """Return purchasing links for a part, optionally disambiguated.
+
+        A separate hook from :meth:`fetch_component_data` because a sourcing
+        provider may need more context than a bare part number to identify a
+        product. Manufacturer part numbers are unique only within a
+        manufacturer, and distributors index them the same way, so a short or
+        purely numeric number can match unrelated products. A provider that can
+        use the manufacturer to pick the right one overrides this.
+
+        The default implementation ignores the hint and returns whatever links
+        :meth:`fetch_component_data` produced, which is correct for any provider
+        whose part numbers are unambiguous.
+
+        Args:
+            mpn: The manufacturer part number to look up.
+            manufacturer: The manufacturer as recorded in the file, used to
+                disambiguate. May be empty.
+
+        Returns:
+            Mapping of field name to URL.
+
+        Raises:
+            PartNotFoundError: If the provider has no such part.
+            AmbiguousPartError: If the number matches several products and the
+                manufacturer does not single one out.
+        """
+        _ = manufacturer
+        return self.fetch_component_data(mpn).source_properties()
 
     def close(self) -> None:  # noqa: B027 - optional hook, deliberately concrete
         """Release any network resources held by this provider.

@@ -13,6 +13,7 @@ __all__ = [
     "ProviderAPIError",
     "RateLimitError",
     "PartNotFoundError",
+    "AmbiguousPartError",
     "ConfigurationError",
     "FileFormatError",
 ]
@@ -97,6 +98,38 @@ class PartNotFoundError(ComponentSyncError):
         """
         super().__init__(message or f"Part not found: {mpn!r}")
         self.mpn = mpn
+
+
+class AmbiguousPartError(ComponentSyncError):
+    """Raised when a part number matches several unrelated products.
+
+    Manufacturer part numbers are only unique within a manufacturer, so a bare
+    number is ambiguous across a catalogue. Mouser, for instance, returns seven
+    different products all numbered ``1028``: side cutting pliers, conduit
+    fittings, an eInk display, a battery holder, punches, a printer shaft and a
+    tape measure. Picking the first result would attach a link to pliers to a
+    battery holder symbol, so the ambiguity is reported instead.
+
+    Attributes:
+        mpn: The ambiguous manufacturer part number.
+        candidates: Human readable ``"manufacturer: description"`` lines, one
+            per product that claimed the number.
+    """
+
+    def __init__(self, mpn: str, candidates: tuple[str, ...]) -> None:
+        """Initialise the error.
+
+        Args:
+            mpn: The ambiguous manufacturer part number.
+            candidates: Descriptions of the competing products.
+        """
+        listed = ", ".join(candidates)
+        super().__init__(
+            f"Part number {mpn!r} matches {len(candidates)} unrelated products "
+            f"({listed}). It needs a manufacturer to identify one."
+        )
+        self.mpn = mpn
+        self.candidates = candidates
 
 
 class ConfigurationError(ComponentSyncError):

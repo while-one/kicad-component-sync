@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 
 from ..exceptions import ConfigurationError
-from .base import BaseProvider
+from .base import BaseProvider, ProviderRole
 from .digikey import DigiKeyProvider
+from .mouser import MouserProvider
 
 __all__ = ["ProviderFactory"]
 
@@ -62,13 +63,26 @@ class ProviderFactory:
         del cls._registry[key]
 
     @classmethod
-    def available(cls) -> list[str]:
+    def available(cls, role: ProviderRole | None = None) -> list[str]:
         """Return the sorted list of registered provider keys.
+
+        Args:
+            role: When given, only providers filling that role are listed. The
+                two roles are not interchangeable, so the CLI offers data
+                providers as the primary choice and sourcing providers
+                separately.
 
         Returns:
             Sorted provider names.
         """
-        return sorted(cls._registry)
+        names = sorted(cls._registry)
+        if role is None:
+            return names
+        return [
+            name
+            for name in names
+            if cls._registry[name].role is role
+        ]
 
     @classmethod
     def create(
@@ -118,3 +132,4 @@ class ProviderFactory:
 
 # The factory is the single extension point, so register built-ins on import.
 ProviderFactory.register(DigiKeyProvider.name, DigiKeyProvider)
+ProviderFactory.register(MouserProvider.name, MouserProvider)

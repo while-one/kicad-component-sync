@@ -87,20 +87,20 @@ class CSVProcessor(BaseProcessor):
             if not mpn:
                 continue
 
-            data, reason = self._try_resolve(mpn)
-            if data is None:
+            existing = {
+                name: (row[i] if i < len(row) else "")
+                for i, name in enumerate(header)
+                if name and i != mpn_index
+            }
+            desired_props, reason = self._desired(mpn, existing)
+            if desired_props is None:
                 if reason:
                     failed.append((mpn, reason))
                 elif mpn not in missing:
                     missing.append(mpn)
                 continue
 
-            existing = {
-                name: (row[i] if i < len(row) else "")
-                for i, name in enumerate(header)
-                if name and i != mpn_index
-            }
-            row_changes = self._classify(mpn, existing, data.as_properties())
+            row_changes = self._classify(mpn, existing, desired_props)
             changes.extend(row_changes)
 
             if row_changes and not dry:
