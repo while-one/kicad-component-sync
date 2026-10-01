@@ -52,14 +52,31 @@ _SUFFIXES: tuple[tuple[float, str], ...] = (
     (1e-12, "p"),
 )
 
+#: Base unit for each component family.
+#:
+#: Resistance is written ``kOhm`` rather than a bare ``K`` so that every
+#: quantity in the library takes the same shape: digits, space, prefixed unit.
 _MULTIPLIERS: dict[ComponentType, str] = {
     _CAPACITANCE: "F",
-    _RESISTANCE: "ohm",
+    _RESISTANCE: "Ohm",
     _INDUCTANCE: "H",
     _FREQUENCY: "Hz",
 }
 
-_NUM = r"([+-]?\d+(?:\.\d+)?)\s*([a-zA-ZµμΩ]+)"
+#: A numeric literal, optionally in scientific notation, followed by a unit.
+#:
+#: The exponent must be consumed as part of the number: treating ``1e3`` as the
+#: number ``1`` with the unit ``e3`` would silently misread it as 1 farad.
+#:
+#: A single-letter unit is only accepted when it is not a bare ``e``, which is
+#: what separates the valid unit ``1 F`` from the incomplete number ``1e400``.
+_NUM = r"([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*([a-zA-ZµμΩ]+)"
+
+#: Suffixes that are really an orphaned exponent marker rather than a unit.
+#:
+#: ``1e400`` is a malformed number, not 1 with the unit "e". Rejecting it keeps
+#: a typo from becoming a plausible-looking value such as 400 V.
+_EXPONENT_LOOKALIKES = frozenset({"e", "E"})
 
 
 def _normalise(text: str) -> str:
@@ -94,6 +111,10 @@ def classify(parameters: dict[str, str]) -> ComponentType:
 def _parse_number(text: str) -> tuple[float, str] | None:
     """Parse the first number and its optional suffix from a value string.
 
+    A trailing ``e`` that is not part of an exponent is rejected. Without this,
+    the malformed input ``1e400`` parses as the number ``1`` with the unit
+    ``e``, and a capacitor would be labelled 1 F.
+
     Args:
         text: A parameter value such as ``"0.1 uF"`` or ``"10 kOhms"``.
 
@@ -103,11 +124,16 @@ def _parse_number(text: str) -> tuple[float, str] | None:
     match = re.search(_NUM, text)
     if match is None:
         return None
+    suffix = match.group(2).strip()
+    if suffix.casefold() in _EXPONENT_LOOKALIKES:
+        return None
     try:
         magnitude = float(match.group(1))
     except ValueError:  # pragma: no cover - regex guarantees a number
         return None
-    return magnitude, match.group(2).strip()
+    if not math.isfinite(magnitude):
+        return None
+    return magnitude, suffix
 
 
 #: Unit names that take no prefix, so "mOhm" is milli-ohm and not mega-ohm.
@@ -147,17 +173,40 @@ def _si_scale(suffix: str, multipliers: dict[str, str]) -> float:
 
 
 
-def _render(value: float, unit: str, *, resistance_style: bool) -> str:
-    """Render a magnitude with an SI prefix and unit.
+def _significant_digits(value: float, digits: int = 9) -> str:
+    """Render a magnitude without trailing zeros or exponent notation.
 
-    Resistors use KiCad's compact schematic notation, where the prefix follows
-    the digits: ``10K``, ``4K7``, ``2R2``, ``0R``.
+    Nine significant digits is far more than any real component value needs,
+    so the result keeps every digit the vendor supplied: 27.12 MHz stays
+    27.12 rather than being rounded to 27.1.
+
+    Args:
+        value: The magnitude to render.
+        digits: Maximum number of significant digits to keep.
+
+    Returns:
+        A plain decimal string, for example ``"4.7"`` or ``"27.12"``.
+    """
+    text = f"{value:.{digits}g}"
+    if "e" in text or "E" in text:  # pragma: no cover - scaled values stay small
+        text = f"{value:f}".rstrip("0").rstrip(".")
+    return text
+
+
+def _render(value: float, unit: str) -> str:
+    """Render a magnitude with an SI prefix and an explicit unit.
+
+    Every quantity uses the same form: digits, a space, then the prefixed unit.
+    ``k`` is written as ``kOhm`` rather than a single ``K`` so a kilo-ohm is
+    never confused with a bare symbol, and so resistance reads the same way as
+    capacitance.
+
+    The largest SI prefix that keeps the magnitude at or above one is used, so
+    1000 pF becomes ``1 nF`` and 1000 nF becomes ``1 uF``.
 
     Args:
         value: The raw magnitude, in base units.
         unit: The base unit for the quantity, for example ``"F"``.
-        resistance_style: When true, render as a resistance rather than as a
-            quantity with a unit.
 
     Returns:
         The formatted label, or ``""`` for a non-finite magnitude.
@@ -165,7 +214,7 @@ def _render(value: float, unit: str, *, resistance_style: bool) -> str:
     if not math.isfinite(value):
         return ""
     if value == 0:
-        return "0R" if resistance_style else f"0 {unit}"
+        return f"0 {unit}"
 
     magnitude = abs(value)
     scale = 1.0
@@ -179,58 +228,11 @@ def _render(value: float, unit: str, *, resistance_style: bool) -> str:
         scale = 1e-12
         prefix = "p"
 
-    scaled = value / scale
-
-    if resistance_style:
-        return _render_resistance(scaled, prefix)
-
-    rounded = round(scaled, 6)
-    digits = str(int(rounded)) if rounded == int(rounded) else f"{rounded:g}"
+    digits = _significant_digits(round(value / scale, 9))
     return f"{digits} {prefix}{unit}"
 
 
-#: SI prefixes rendered in the case KiCad's schematic notation expects.
-_RESISTANCE_PREFIX_CASE = {
-    "k": "K",
-    "M": "M",
-    "G": "G",
-    "T": "T",
-    "m": "m",
-    "u": "R",
-    "n": "R",
-    "p": "R",
-}
 
-
-def _render_resistance(scaled: float, prefix: str) -> str:
-    """Render a resistance in KiCad's compact notation.
-
-    Whole multiples become ``10K``, ``1M``. Fractional ones use the digit
-    substitution form ``4K7``, ``2R2``, and sub-unit values keep an explicit
-    prefix such as ``100m``.
-
-    Args:
-        scaled: The magnitude after SI scaling.
-        prefix: The SI prefix that was removed, for example ``"k"``.
-
-    Returns:
-        A label such as ``10K``, ``4K7``, ``2R2`` or ``100m``.
-    """
-    suffix = _RESISTANCE_PREFIX_CASE.get(prefix, prefix)
-    text = f"{scaled:g}"
-
-    if "." not in text:
-        return f"{text}{suffix}"
-
-    head, _, tail = text.partition(".")
-
-    if prefix in ("", "m", "u", "n", "p"):
-        # Sub-unit and base-unit fractions use R as the decimal point:
-        # 1.5 Ohm -> 1R5, 4.7u -> 4R7, 2.2n -> 2R2.
-        return f"{head}R{tail}"
-
-    # Larger prefixes stay attached to the magnitude: 4.7k -> 4K7, 1.5M -> 1M5.
-    return f"{head}{suffix}{tail}"
 
 
 def derive_value(parameters: dict[str, str], *, current: str = "") -> str:
@@ -273,8 +275,4 @@ def derive_value(parameters: dict[str, str], *, current: str = "") -> str:
         # resistor is a real, orderable part.
         return ""
 
-    return _render(
-        base,
-        _MULTIPLIERS[kind],
-        resistance_style=(kind == _RESISTANCE),
-    )
+    return _render(base, _MULTIPLIERS[kind])

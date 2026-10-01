@@ -137,20 +137,35 @@ contained two values.
 
 ### `Value` is derived, not invented
 
-`Value` is a human-readable label (`100 pF`, `10K`, `560 nH`, `16 MHz`), and
-those are exactly the quantities a distributor publishes as parameters:
+`Value` is a human-readable label, and it is exactly the quantity a distributor
+publishes as a parameter. The project uses **SI notation with an explicit unit
+everywhere** — there is one rendering path, no options and no per-type variants:
 
-| Parameter present | Example input | Derived |
+| Parameter present | Vendor input | Derived |
 | --- | --- | --- |
 | `Capacitance` | `0.1 uF` | `100 nF` |
-| `Resistance` | `10 kOhms`, `4.7 kOhms`, `0 Ohms` | `10K`, `4K7`, `0R` |
+| `Resistance` | `10 kOhms` | `10 kOhm` |
+| `Resistance` | `4.7 kOhms` | `4.7 kOhm` |
+| `Resistance` | `0 Ohms` | `0 Ohm` |
 | `Inductance` | `560 nH` | `560 nH` |
 | `Frequency` | `27.12 MHz` | `27.12 MHz` |
 
-When a part exposes none of those — an IC, connector or switch — **nothing is
-written** and the existing `Value` is left untouched. That is deliberate: those
-symbols conventionally carry the part number as their value, and overwriting it
-would destroy them.
+Notes on the convention:
+
+- **No unit symbols.** `kOhm` and `uF`, never `kΩ` or `µF`. These are plain-text
+  fields, and `Ω` is awkward to type and easy to mangle.
+- **Largest fitting prefix**, so 1000 nF becomes `1 uF` and 1000 pF becomes
+  `1 nF`.
+- **Resistance is not special-cased.** R-notation (`10K`, `4K7`) is a real and
+  defensible alternative, but mixing the two styles in one library is what
+  makes a BOM hard to read, so everything uses SI.
+- **Resistance in ohms stays `Ohm`, not `R`**, matching how distributors write
+  it and avoiding ambiguity with the `R` reference designator.
+
+When a part exposes none of those parameters — an IC, connector or switch —
+**nothing is written** and the existing `Value` is left untouched. Those symbols
+conventionally carry the part number as their value, and overwriting it would
+destroy them.
 
 ### URLs are never synthesised
 
