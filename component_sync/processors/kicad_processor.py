@@ -100,6 +100,7 @@ class KiCadSymProcessor(BaseProcessor):
         edits: list[TextEdit] = []
         changes = []
         missing: list[str] = []
+        failed: list[tuple[str, str]] = []
         seen: set[str] = set()
 
         for symbol in root.children("symbol"):
@@ -116,9 +117,11 @@ class KiCadSymProcessor(BaseProcessor):
             mpn = mpn.strip()
             seen.add(mpn)
 
-            data = self._resolve(mpn)
+            data, reason = self._try_resolve(mpn)
             if data is None:
-                if mpn not in missing:
+                if reason:
+                    failed.append((mpn, reason))
+                elif mpn not in missing:
                     missing.append(mpn)
                 continue
 
@@ -145,6 +148,7 @@ class KiCadSymProcessor(BaseProcessor):
             dry_run=dry,
             written=bool(edits),
             lookups=self.cache.stats.describe(),
+            failed_parts=tuple(failed),
         )
         if dry:
             self._report(result)

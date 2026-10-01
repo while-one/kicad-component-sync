@@ -13,7 +13,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .exceptions import ComponentSyncError
+from .exceptions import ComponentSyncError, RateLimitError
 from .processors.base import BaseProcessor
 from .processors.csv_processor import CSVProcessor
 from .processors.kicad_processor import KiCadSymProcessor
@@ -197,6 +197,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             result = processor.process(input_file)
     except ComponentSyncError as exc:
+        if isinstance(exc, RateLimitError):
+            print(f"error: {exc.message}", file=sys.stderr)
+            print(
+                "\nNothing was written. The quota is per calendar day and resets "
+                "on its own; re-run afterwards.",
+                file=sys.stderr,
+            )
+            return 2
         print(f"error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
@@ -206,7 +214,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.dry_run:
         print(result.summary())
 
-    return 0 if not result.missing_parts or args.dry_run else 1
+    return 0 if not result.incomplete or args.dry_run else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

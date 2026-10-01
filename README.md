@@ -301,6 +301,33 @@ There is deliberately **no `Mouser` handling**. This tool queries DigiKey and ha
 no Mouser API, so it cannot produce a Mouser link and does not try. Existing
 Mouser links are preserved exactly as they are.
 
+## Rate limits
+
+DigiKey's **Product Information** API allows **120 requests per minute** and
+**1000 per day**. The daily allowance is the binding constraint: a full run over
+this library spends roughly 70 of it, so the quota runs out after about 14 runs
+and **resets at midnight UTC**. Both windows are enforced by the provider:
+
+- Requests are paced to about 109/minute, so a run never provokes a burst
+  refusal in the first place.
+- A **per-minute burst** is retried automatically, honouring the `Retry-After`
+  header, because a burst clears within seconds.
+- An **exhausted daily quota** stops the run immediately with the reset time.
+  Every remaining request would be refused too, so continuing would only repeat
+  the message and bury the one fact that matters. Nothing is written, and the
+  exit status is `2`.
+
+A quota refusal is reported as its own category, kept apart from unstocked
+parts, because the two call for opposite responses:
+
+| Category | Meaning |
+| --- | --- |
+| `NOT QUERIED` | the provider refused or failed; **re-running may well succeed** |
+| `UNRESOLVED` | the distributor genuinely has no such part; fix the MPN |
+
+A per-part provider fault no longer aborts the run, so one bad part does not
+throw away the results for the other 56.
+
 ## Adding a provider
 
 ```python
@@ -322,6 +349,8 @@ the CLI automatically.
 
 ## Known limitations
 
+- **The daily quota is real.** 1000 requests/day, resetting at midnight UTC.
+  A full run costs about 70. See *Rate limits* above.
 - **The cache is per-run, not on disk.** Starting a second run re-requests
   everything. Persisting responses across runs would go stale, and a stale price
   or stock figure is worse than a slow run.
@@ -335,7 +364,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 236 tests
+python -m pytest -q                     # 250 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

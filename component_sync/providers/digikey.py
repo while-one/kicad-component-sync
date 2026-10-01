@@ -19,7 +19,12 @@ from typing import Any
 
 import requests
 
-from ..exceptions import ConfigurationError, PartNotFoundError, ProviderAPIError
+from ..exceptions import (
+    ConfigurationError,
+    PartNotFoundError,
+    ProviderAPIError,
+    RateLimitError,
+)
 from ..models import ComponentData
 from ..ranges import parse_range
 from ..values import derive_value
@@ -74,7 +79,26 @@ _PASSIVE_CATEGORIES = frozenset(
     }
 )
 
-#: How many candidates to request per search page.
+#: Minimum seconds between product requests.
+#:
+#: Product Information is limited to 120 requests per minute and 1000 per day. A
+#: full run over this library spends roughly 70 of the daily allowance, so the
+#: daily quota is the binding constraint rather than the burst. Pacing at about
+#: 109 requests per minute keeps a run clear of the per-minute ceiling without
+#: adding noticeable time: 57 parts take roughly half a minute.
+_MIN_REQUEST_INTERVAL = 0.55
+
+#: How many times to retry a request refused by the per-minute burst limit.
+#:
+#: A burst clears within seconds, so retrying is worthwhile. The daily quota is
+#: not retried at all, because it can be hours away.
+_MAX_BURST_RETRIES = 3
+
+#: How long to wait before the first burst retry, when no header says otherwise.
+_INITIAL_BACKOFF = 2.0
+
+#: Upper bound on a single wait, so a malformed ``Retry-After`` cannot hang a run.
+_MAX_BACKOFF = 60.0
 #:
 #: 50 is the largest value the API accepts; anything higher is rejected with
 #: HTTP 400. This matters more than it looks. The search is a fuzzy, tokenised
@@ -134,6 +158,8 @@ class DigiKeyProvider(BaseProvider):
         self._session = session if session is not None else requests.Session()
         self._owns_session = session is None
         self._token: str | None = None
+        #: Monotonic timestamp of the last product request, for pacing.
+        self._last_request: float | None = None
         self._token_expiry: float = 0.0
 
     # ------------------------------------------------------------------
@@ -215,6 +241,138 @@ class DigiKeyProvider(BaseProvider):
             raise PartNotFoundError(mpn)
         return self._to_component_data(mpn, match)
 
+    def _pace(self) -> None:
+        """Sleep if the previous request was too recent.
+
+        Keeps a run under the per-minute ceiling without relying on the API to
+        refuse work. The interval is measured between request *starts*, so the
+        pacing holds even when a response is slow.
+        """
+        if self._last_request is None:
+            self._last_request = time.monotonic()
+            return
+        elapsed = time.monotonic() - self._last_request
+        if elapsed < _MIN_REQUEST_INTERVAL:
+            time.sleep(_MIN_REQUEST_INTERVAL - elapsed)
+        self._last_request = time.monotonic()
+
+    @staticmethod
+    def _describe_error(response: requests.Response) -> str:
+        """Return a readable one line description of a failed response.
+
+        DigiKey returns a JSON:API problem document, so echoing the raw body
+        prints several hundred characters of punctuation and hides the one fact
+        that matters.
+
+        Args:
+            response: The failed response.
+
+        Returns:
+            A single line naming the status and the reason.
+        """
+        try:
+            payload = response.json()
+        except ValueError:
+            text = " ".join(response.text.split())[:160]
+            return f"HTTP {response.status_code}: {text}" if text else (
+                f"HTTP {response.status_code}"
+            )
+        if not isinstance(payload, dict):  # pragma: no cover - defensive
+            return f"HTTP {response.status_code}"
+        for key in ("detail", "ErrorMessage", "message", "title"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return f"HTTP {response.status_code}: {' '.join(value.split())}"
+        return f"HTTP {response.status_code}"
+
+    @staticmethod
+    def _rate_limit(response: requests.Response) -> tuple[bool, int, str]:
+        """Classify a 429 as a daily quota or a per-minute burst.
+
+        Args:
+            response: The 429 response.
+
+        Returns:
+            A ``(daily, retry_after, resets_at)`` triple.
+        """
+        headers = response.headers
+        try:
+            retry_after = int(headers.get("Retry-After", "0"))
+        except (TypeError, ValueError):  # pragma: no cover - malformed header
+            retry_after = 0
+        remaining = headers.get("X-RateLimit-Remaining")
+        resets_at = headers.get("X-RateLimit-ResetTime", "") or headers.get(
+            "X-BurstLimit-ResetTime", ""
+        )
+        # A daily refusal is the one that reports zero remaining for the whole
+        # day window; a burst reports the per-minute counters instead.
+        daily = remaining is not None and remaining.strip() == "0"
+        return daily, retry_after, resets_at
+
+    def _post(
+        self, headers: dict[str, str | None], body: dict[str, Any], mpn: str
+    ) -> requests.Response:
+        """POST to the search endpoint, pacing and retrying a burst refusal.
+
+        Args:
+            headers: Authenticated request headers.
+            body: JSON request body.
+            mpn: Part number being looked up, used in error messages.
+
+        Returns:
+            A response whose status is not a rate limit refusal.
+
+        Raises:
+            RateLimitError: If the daily quota is exhausted, or a burst refusal
+                survives every retry.
+            ProviderAPIError: On a transport failure.
+        """
+        attempt = 0
+        while True:
+            self._pace()
+            try:
+                response = self._session.post(
+                    PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
+                )
+            except requests.RequestException as exc:
+                raise ProviderAPIError(f"DigiKey search failed for {mpn!r}: {exc}") from exc
+
+            if response.status_code != 429:
+                return response
+
+            daily, retry_after, resets_at = self._rate_limit(response)
+            when = resets_at or f"in {retry_after}s" if retry_after else "shortly"
+            if daily:
+                raise RateLimitError(
+                    f"DigiKey daily request quota exhausted (1000 per day). "
+                    f"Resets at {when}. The run stopped rather than waiting; "
+                    f"re-run after the quota returns.",
+                    retry_after=retry_after,
+                    resets_at=resets_at,
+                    daily=True,
+                )
+
+            attempt += 1
+            if attempt > _MAX_BURST_RETRIES:
+                raise RateLimitError(
+                    f"DigiKey per-minute rate limit still refusing after "
+                    f"{_MAX_BURST_RETRIES} retries.",
+                    retry_after=retry_after,
+                    resets_at=resets_at,
+                )
+            wait = min(
+                float(retry_after) if retry_after else _INITIAL_BACKOFF * (2 ** (attempt - 1)),
+                _MAX_BACKOFF,
+            )
+            LOGGER.warning(
+                "DigiKey burst limit hit for %r; waiting %.1fs (retry %d/%d)",
+                mpn,
+                wait,
+                attempt,
+                _MAX_BURST_RETRIES,
+            )
+            time.sleep(wait)
+
     def _search(self, mpn: str, headers: dict[str, str | None]) -> dict[str, Any] | None:
         """Return the product whose MPN matches ``mpn`` exactly, paging if needed.
 
@@ -239,20 +397,14 @@ class DigiKeyProvider(BaseProvider):
                 "Limit": _SEARCH_LIMIT,
                 "Offset": page * _SEARCH_LIMIT,
             }
-            try:
-                response = self._session.post(
-                    PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
-                )
-            except requests.RequestException as exc:
-                raise ProviderAPIError(f"DigiKey search failed for {mpn!r}: {exc}") from exc
+            response = self._post(headers, body, mpn)
 
             if response.status_code == 404:
                 raise PartNotFoundError(mpn)
             if response.status_code != 200:
-                detail = response.text[:200].replace("\n", " ")
                 raise ProviderAPIError(
-                    f"DigiKey search for {mpn!r} failed with HTTP "
-                    f"{response.status_code}: {detail}"
+                    f"DigiKey search for {mpn!r} failed: "
+                    f"{self._describe_error(response)}"
                 )
 
             try:

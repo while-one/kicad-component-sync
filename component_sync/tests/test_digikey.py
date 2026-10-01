@@ -28,6 +28,7 @@ from component_sync.exceptions import (
     ConfigurationError,
     PartNotFoundError,
     ProviderAPIError,
+    RateLimitError,
 )
 from component_sync.models import ComponentData
 from component_sync.providers.digikey import PRODUCT_URL, TOKEN_URL, DigiKeyProvider
@@ -36,6 +37,9 @@ MPN = "GRM155R61C104KA88D"
 
 #: Must match ``_MAX_SEARCH_PAGES`` in the provider.
 _MAX_PAGES = 4
+
+#: Must match ``_MAX_BURST_RETRIES`` in the provider.
+_MAX_BURST_RETRIES = 3
 
 TOKEN_PAYLOAD: dict[str, Any] = {
     "access_token": "tok-123",
@@ -313,6 +317,185 @@ class TestMappingAgainstCapturedResponses(CapturedPayloads):
         data = self._fetch("TXS0108EPWR")
         assert data.temp_min == "-40 C"
         assert data.temp_max == "+85 C"
+
+
+class TestRateLimit(CapturedPayloads):
+    """A refused request must be readable, and must not lose the run.
+
+    Product Information is limited to 120 requests per minute and 1000 per day.
+    The two demand opposite responses: a burst clears within seconds and is worth
+    retrying, while a daily quota can be hours away and is not.
+    """
+
+    @staticmethod
+    def _refusal(daily: bool) -> mock.MagicMock:
+        """Return a 429 response with realistic headers.
+
+        Args:
+            daily: Whether to advertise the daily window rather than a burst.
+
+        Returns:
+            A mock response.
+        """
+        resp = mock.MagicMock()
+        resp.status_code = 429
+        resp.json.return_value = {
+            "title": "Too Many Requests",
+            "status": 429,
+            "detail": (
+                "Daily Ratelimit exceeded. Please try again after the number of "
+                "seconds in the Retry-After header"
+                if daily
+                else "BurstLimit exceeded"
+            ),
+        }
+        resp.text = '{"detail": "..."}'
+        resp.headers = (
+            {"Retry-After": "12397", "X-RateLimit-Remaining": "0",
+             "X-RateLimit-ResetTime": "2026-10-02T00:00:00.000Z"}
+            if daily
+            else {"Retry-After": "3", "X-BurstLimit-Remaining": "0",
+                  "X-BurstLimit-ResetTime": "2026-10-01T12:00:10.000Z"}
+        )
+        return resp
+
+    def test_daily_quota_is_not_retried(self) -> None:
+        """Waiting hours mid-run helps nobody, so the run stops at once."""
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else self._refusal(daily=True)
+        )
+        with pytest.raises(RateLimitError) as info:
+            provider.fetch_component_data(MPN)
+        assert info.value.daily is True
+        assert "1000 per day" in info.value.message
+        assert "2026-10-02T00:00:00.000Z" in info.value.message
+
+    def test_daily_quota_costs_exactly_one_attempt(self) -> None:
+        """No retry storm against a quota that cannot clear."""
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else self._refusal(daily=True)
+        )
+        with pytest.raises(RateLimitError):
+            provider.fetch_component_data(MPN)
+        # One token call plus a single refused search.
+        assert session_of(provider).post.call_count == 2
+
+    def test_burst_is_retried_and_can_succeed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A burst clears in seconds, so retrying recovers the part."""
+        monkeypatch.setattr("component_sync.providers.digikey.time.sleep", lambda _s: None)
+        attempts = {"n": 0}
+
+        def search(url: str, **_: object) -> mock.MagicMock:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return self._refusal(daily=False)
+            return response(200, search_payload(MPN))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = search
+        data = provider.fetch_component_data(MPN)
+        assert data.mpn == MPN
+        assert attempts["n"] == 2
+
+    def test_burst_gives_up_eventually(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A persistent refusal is reported, not retried forever."""
+        monkeypatch.setattr("component_sync.providers.digikey.time.sleep", lambda _s: None)
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else self._refusal(daily=False)
+        )
+        with pytest.raises(RateLimitError) as info:
+            provider.fetch_component_data(MPN)
+        assert info.value.daily is False
+        # One token call plus the initial attempt and every retry.
+        assert session_of(provider).post.call_count == 2 + _MAX_BURST_RETRIES
+
+    def test_retry_after_header_is_honoured(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The distributor states the wait, so the client does not guess."""
+        waits: list[float] = []
+        monkeypatch.setattr(
+            "component_sync.providers.digikey.time.sleep", lambda s: waits.append(s)
+        )
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else self._refusal(daily=False)
+        )
+        with pytest.raises(RateLimitError):
+            provider.fetch_component_data(MPN)
+        assert waits, "the run slept before retrying"
+        assert all(0 < w <= 60 for w in waits)
+
+    def test_rate_limit_message_is_actionable_not_dumped(self) -> None:
+        """The message states the quota and the reset, not the raw problem document.
+
+        The API's own text says only "try again after the number of seconds in
+        the Retry-After header", which tells the reader nothing they can act on.
+        """
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else self._refusal(daily=True)
+        )
+        with pytest.raises(RateLimitError) as info:
+            provider.fetch_component_data(MPN)
+        message = info.value.message
+        assert "{" not in message, "raw JSON must not reach the terminal"
+        assert "1000 per day" in message
+        assert "2026-10-02T00:00:00.000Z" in message
+        assert "Retry-After header" not in message, (
+            "the message must not pass the reader back to the API's wording"
+        )
+
+    def test_server_error_body_is_also_summarised(self) -> None:
+        """A 500 is reported with the reason the API gave."""
+        provider = self._authenticated(
+            response(500, {"detail": "Something went wrong upstream"})
+        )
+        with pytest.raises(ProviderAPIError, match="Something went wrong upstream"):
+            provider.fetch_component_data(MPN)
+
+    def test_non_json_error_body_still_reads(self) -> None:
+        """A plain-text error page is condensed rather than dumped."""
+        bad = mock.MagicMock()
+        bad.status_code = 502
+        bad.json.side_effect = ValueError("not json")
+        bad.text = "  <html>\n  <body>Bad Gateway</body>\n  </html>  "
+        provider = self._authenticated(bad)
+        with pytest.raises(ProviderAPIError, match="Bad Gateway"):
+            provider.fetch_component_data(MPN)
+
+    def test_requests_are_paced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A run stays under the per-minute ceiling without being told to."""
+        waits: list[float] = []
+        clock = {"t": 1000.0}
+
+        def fake_monotonic() -> float:
+            return clock["t"]
+
+        def fake_sleep(seconds: float) -> None:
+            waits.append(seconds)
+            clock["t"] += seconds
+
+        monkeypatch.setattr("component_sync.providers.digikey.time.sleep", fake_sleep)
+        monkeypatch.setattr(
+            "component_sync.providers.digikey.time.monotonic", fake_monotonic
+        )
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: (
+            response(200, TOKEN_PAYLOAD) if url == TOKEN_URL else response(200, search_payload(MPN))
+        )
+        for _ in range(3):
+            provider.fetch_component_data(MPN)
+        # The cache is in the processor, so each call here re-requests; what
+        # matters is that the provider waited between them.
+        assert waits, "no pacing between successive product requests"
+        assert all(w > 0 for w in waits)
+        assert clock["t"] >= 1000.0
 
 
 class TestPlaceholderValues(CapturedPayloads):

@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 from ..cache import LookupCache
-from ..exceptions import FileFormatError  # noqa: F401  (re-exported for subclasses)
+from ..exceptions import (  # noqa: F401  (FileFormatError re-exported for subclasses)
+    ComponentSyncError,
+    FileFormatError,
+    RateLimitError,
+)
 from ..models import ChangeAction, ComponentData, ProcessResult, PropertyChange
 from ..providers.base import BaseProvider
 from ..reporting import Palette, default_palette, render_report
 from ..selection import FieldSelection
 
 __all__ = ["BaseProcessor", "atomic_write"]
+
+LOGGER = logging.getLogger(__name__)
 
 
 def atomic_write(path: Path, text: str, encoding: str = "utf-8") -> None:
@@ -148,8 +155,7 @@ class BaseProcessor(ABC):
 
         A part number that is not stocked is reported to the caller, which lists
         it so the author can check it, rather than being raised: an unresolvable
-        MPN is data the author needs to see, not a crash. Every other provider
-        failure propagates, because that is a genuine fault worth stopping for.
+        MPN is data the author needs to see, not a crash.
 
         Args:
             mpn: Manufacturer part number to resolve.
@@ -158,6 +164,42 @@ class BaseProcessor(ABC):
             Component data, or ``None`` when the provider has no match.
         """
         return self.cache.fetch(self.provider, mpn)
+
+    def _try_resolve(self, mpn: str) -> tuple[ComponentData | None, str]:
+        """Resolve one MPN, converting a provider fault into a reportable note.
+
+        A failure part-way through a run used to abort the whole thing, so an
+        exhausted rate limit on part 57 of 57 threw away the other 56 results and
+        the author got no report at all. An ordinary fault is now recorded
+        against that one part and the run continues, so the work already done is
+        still reported. Faults are never cached, so a later run retries them.
+
+        An exhausted *daily* quota is the exception and stops the run. Once the
+        daily allowance is gone every remaining request will be refused too, so
+        continuing would only print the same refusal 56 more times and bury the
+        single fact the author needs. A per-minute burst does not stop the run,
+        because the provider already retried it and other parts may succeed.
+
+        Args:
+            mpn: Manufacturer part number to resolve.
+
+        Returns:
+            A ``(data, reason)`` pair. ``data`` is ``None`` for both an unstocked
+            part and a failed lookup; ``reason`` is non-empty only for the latter.
+
+        Raises:
+            RateLimitError: If the distributor's daily quota is exhausted.
+        """
+        try:
+            return self._resolve(mpn), ""
+        except RateLimitError as exc:
+            if exc.daily:
+                raise
+            LOGGER.warning("Lookup failed for %r: %s", mpn, exc)
+            return None, exc.message
+        except ComponentSyncError as exc:
+            LOGGER.warning("Lookup failed for %r: %s", mpn, exc)
+            return None, exc.message
 
     def _classify(
         self,

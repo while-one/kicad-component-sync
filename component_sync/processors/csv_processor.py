@@ -77,6 +77,7 @@ class CSVProcessor(BaseProcessor):
 
         changes: list[PropertyChange] = []
         missing: list[str] = []
+        failed: list[tuple[str, str]] = []
         column_values: dict[int, dict[str, str]] = {}
 
         for row in rows[1:]:
@@ -86,9 +87,11 @@ class CSVProcessor(BaseProcessor):
             if not mpn:
                 continue
 
-            data = self._resolve(mpn)
+            data, reason = self._try_resolve(mpn)
             if data is None:
-                if mpn not in missing:
+                if reason:
+                    failed.append((mpn, reason))
+                elif mpn not in missing:
                     missing.append(mpn)
                 continue
 
@@ -120,6 +123,7 @@ class CSVProcessor(BaseProcessor):
             dry_run=dry,
             written=bool(changes) and not dry,
             lookups=self.cache.stats.describe(),
+            failed_parts=tuple(failed),
         )
         if dry:
             self._report(result)

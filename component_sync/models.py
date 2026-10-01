@@ -210,6 +210,12 @@ class ProcessResult:
         written: Whether the file was actually replaced on disk.
         lookups: How many provider lookups were served from cache rather than
             requested, or ``None`` when the processor reported no statistics.
+        failed_parts: ``(mpn, reason)`` pairs for parts the provider could not
+            be asked about at all, such as an exhausted rate limit. These are
+            kept apart from ``missing_parts``, because "the distributor does not
+            stock this" and "the distributor refused to answer" call for
+            different actions, and conflating them hides a transient fault as a
+            permanent data problem.
     """
 
     file_path: str
@@ -218,6 +224,17 @@ class ProcessResult:
     dry_run: bool = False
     written: bool = False
     lookups: str | None = None
+    failed_parts: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def incomplete(self) -> bool:
+        """Return whether any part was left without data.
+
+        A write run that could not resolve or could not ask about some parts
+        exits non-zero on this, so a partially enriched library is never
+        mistaken for a finished one.
+        """
+        return bool(self.missing_parts or self.failed_parts)
 
     @property
     def modified_count(self) -> int:
@@ -237,10 +254,16 @@ class ProcessResult:
             f"Mode        : {'dry-run (no changes written)' if self.dry_run else 'write'}",
             f"Changes     : {self.modified_count}",
             f"Missing     : {len(self.missing_parts)}",
+            f"Not queried : {len(self.failed_parts)}",
             f"Written     : {'yes' if self.written else 'no'}",
         ]
         if self.lookups:
             lines.append(f"Cache       : {self.lookups}")
+        if self.failed_parts:
+            lines.append("")
+            lines.append("Not queried (provider error):")
+            for mpn, reason in self.failed_parts:
+                lines.append(f"  x {mpn}: {reason}")
         if self.missing_parts:
             lines.append("")
             lines.append("Parts not found:")

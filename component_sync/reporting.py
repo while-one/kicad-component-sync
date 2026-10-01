@@ -286,6 +286,10 @@ def render_report(
     lines.append(f"  needs review  {len(overwrites):>4}  overwrites a value you already have")
     lines.append(f"  value edits   {len(values):>4}  SI convention, see below")
     lines.append(f"  safe adds     {len(adds):>4}  fills an empty field")
+    if result.failed_parts:
+        lines.append(
+            f"  not queried   {len(result.failed_parts):>4}  provider error, retry may work"
+        )
     lines.append(f"  unresolved    {len(result.missing_parts):>4}  not stocked, needs action")
     lines.append("")
 
@@ -312,6 +316,16 @@ def render_report(
             _format_section(pal, f"SAFE ADDS  ({len(adds)})", pal.ADD, adds, width)
         )
 
+    if result.failed_parts:
+        lines.append(pal(pal.OVERWRITE, f"NOT QUERIED  ({len(result.failed_parts)})"))
+        lines.append("  The provider could not be asked about these. This is not the")
+        lines.append("  same as an unstocked part, and re-running may well succeed.")
+        lines.append("")
+        for mpn, reason in result.failed_parts:
+            lines.append(f"  {pal(pal.OVERWRITE, 'x')} {mpn}")
+            lines.append(f"      {pal(pal.DIM, reason)}")
+        lines.append("")
+
     if result.missing_parts:
         lines.append(pal(pal.WARN, f"UNRESOLVED  ({len(result.missing_parts)})"))
         lines.append("  These part numbers did not resolve. The library is unchanged")
@@ -321,7 +335,7 @@ def render_report(
             lines.append(f"  {pal(pal.WARN, '!')} {mpn}")
         lines.append("")
 
-    if not changes and not result.missing_parts:
+    if not changes and not result.missing_parts and not result.failed_parts:
         lines.append("  (nothing to do - already up to date)")
         lines.append("")
 

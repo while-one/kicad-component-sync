@@ -17,6 +17,8 @@ from component_sync.reporting import (
 )
 from component_sync.selection import FieldSelection, split_field_list
 
+from .conftest import StubProvider
+
 
 def change(
     field: str,
@@ -487,3 +489,129 @@ class TestProcessorIntegration:
 
         assert [c.field_name for c in result.changes] == ["Voltage Rating"]
         assert 'property "Voltage Rating" "0 vdc"' in path.read_text(encoding="utf-8")
+
+
+class TestFailedLookupsAreReported:
+    """A provider fault on one part must not discard the whole run.
+
+    Aborting used to throw away the other 56 results, so an exhausted rate limit
+    on the last part produced no report at all.
+    """
+
+    def test_not_queried_is_a_section_of_its_own(self) -> None:
+        """A failed lookup is visibly different from an unstocked part."""
+        result = ProcessResult(
+            file_path="lib",
+            failed_parts=(("P1", "DigiKey daily request quota exhausted"),),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert "NOT QUERIED  (1)" in out
+        assert "not queried" in out
+        assert "re-running may well succeed" in out
+        assert "P1" in out
+        assert "quota exhausted" in out
+
+    def test_failed_and_missing_are_separate(self) -> None:
+        """Conflating them would hide a transient fault as a data problem."""
+        result = ProcessResult(
+            file_path="lib",
+            missing_parts=("GONE-1",),
+            failed_parts=(("P1", "rate limited"),),
+        )
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert "UNRESOLVED  (1)" in out
+        assert "NOT QUERIED  (1)" in out
+        assert "! GONE-1" in out
+        assert "x P1" in out
+
+    def test_incomplete_covers_both_kinds(self) -> None:
+        """A write run must exit non-zero for either."""
+        assert not ProcessResult(file_path="x").incomplete
+        assert ProcessResult(file_path="x", missing_parts=("a",)).incomplete
+        assert ProcessResult(file_path="x", failed_parts=(("a", "b"),)).incomplete
+
+
+class TestPartialRunSurvives:
+    """A failing part mid-run still leaves the rest reported."""
+
+    def test_run_continues_past_a_provider_fault(self, tmp_path: Path) -> None:
+        """The healthy part is still enriched after the failing one.
+
+        The library holds two symbols. The first part raises a rate limit, the
+        second resolves normally, and both outcomes must reach the report.
+        """
+        from component_sync.exceptions import RateLimitError
+        from component_sync.models import ComponentData
+
+        def block(name: str, part: str) -> str:
+            """Return one symbol block carrying a Part property.
+
+            Args:
+                name: Symbol name.
+                part: Manufacturer part number.
+
+            Returns:
+                The symbol source.
+            """
+            return (
+                f'\t(symbol "{name}"\n'
+                f'\t\t(property "Part" "{part}"\n'
+                f"\t\t\t(at 0 0 0)\n"
+                f"\t\t)\n"
+                f"\t)\n"
+            )
+
+        class Flaky(StubProvider):
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                if mpn == "BAD-1":
+                    raise RateLimitError("per-minute limit", daily=False)
+                return ComponentData(mpn=mpn, manufacturer="YAGEO", value="10 kOhm")
+
+        library = (
+            "(kicad_symbol_lib\n"
+            "\t(version 20231120)\n"
+            + block("BROKEN", "BAD-1")
+            + block("FINE", "GOOD-1")
+            + ")\n"
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(library, encoding="utf-8")
+
+        result = KiCadSymProcessor(Flaky({}), dry_run=True, colour=False).process(path)
+
+        assert [mpn for mpn, _ in result.failed_parts] == ["BAD-1"]
+        assert "per-minute limit" in result.failed_parts[0][1]
+        assert {c.identifier for c in result.changes} == {"FINE"}
+        assert "BROKEN" not in {c.identifier for c in result.changes}
+        assert result.incomplete
+
+    def test_daily_quota_stops_the_run(self, tmp_path: Path) -> None:
+        """Once the daily allowance is gone, every later request will fail too.
+
+        Continuing would print the same refusal once per remaining part and bury
+        the one fact the author needs, so the run stops immediately.
+        """
+        from component_sync.exceptions import RateLimitError
+        from component_sync.models import ComponentData
+
+        asked: list[str] = []
+
+        class Exhausted(StubProvider):
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                asked.append(mpn)
+                raise RateLimitError("daily quota exhausted", daily=True)
+
+        library = (
+            "(kicad_symbol_lib\n"
+            "\t(version 20231120)\n"
+            + '    (symbol "A"\n\t\t(property "Part" "P-1"\n\t\t\t(at 0 0 0)\n\t\t)\n\t)\n'
+            + '    (symbol "B"\n\t\t(property "Part" "P-2"\n\t\t\t(at 0 0 0)\n\t\t)\n\t)\n'
+            + ")\n"
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(library, encoding="utf-8")
+
+        with pytest.raises(RateLimitError):
+            KiCadSymProcessor(Exhausted({}), dry_run=True, colour=False).process(path)
+
+        assert asked == ["P-1"], "stopped after the first refusal"
