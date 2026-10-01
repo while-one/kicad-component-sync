@@ -34,6 +34,9 @@ from component_sync.providers.digikey import PRODUCT_URL, TOKEN_URL, DigiKeyProv
 
 MPN = "GRM155R61C104KA88D"
 
+#: Must match ``_MAX_SEARCH_PAGES`` in the provider.
+_MAX_PAGES = 4
+
 TOKEN_PAYLOAD: dict[str, Any] = {
     "access_token": "tok-123",
     "token_type": "Bearer",
@@ -381,6 +384,131 @@ class TestPassiveGate(CapturedPayloads):
         """Crystals are discrete components whose Value is their frequency."""
         data = self._fetch("LFXTAL085849")
         assert data.value == "27.12 MHz"
+
+
+class TestSearchPaging(CapturedPayloads):
+    """A short part number must not be reported as unstocked.
+
+    DigiKey's search is a fuzzy, tokenised match. The bare part number
+    ``1028`` returns 19,963 candidate products, and the Keystone part of that
+    number sits around position 50. Fetching only ten candidates per request put
+    it outside the window, so a stocked part was reported as missing.
+    """
+
+    @staticmethod
+    def _page(mpns: list[str], total: int = 19963) -> dict[str, Any]:
+        """Return a search response carrying the given candidate MPNs.
+
+        Args:
+            mpns: Manufacturer part numbers present on this page.
+            total: Total number of matches the API reports.
+
+        Returns:
+            A response body.
+        """
+        return {
+            "ProductsCount": total,
+            "Products": [
+                {
+                    "ManufacturerProductNumber": value,
+                    "Manufacturer": {"Name": "Decoy"},
+                    "Description": {"ProductDescription": f"filler {value}"},
+                    "Parameters": [],
+                }
+                for value in mpns
+            ],
+        }
+
+    def test_page_size_is_the_maximum_the_api_accepts(self) -> None:
+        """Limit 50 is accepted; 51 and above are rejected with HTTP 400."""
+        from component_sync.providers.digikey import _SEARCH_LIMIT
+
+        assert _SEARCH_LIMIT == 50
+
+    def test_exact_match_on_first_page_costs_one_request(self) -> None:
+        """A distinctive part number resolves without paging."""
+        calls: list[int] = []
+
+        def dispatch(url: str, **kwargs: Any) -> Any:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            calls.append(kwargs["json"]["Offset"])
+            return response(200, self._page(["SOMETHING-ELSE", MPN]))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = dispatch
+        data = provider.fetch_component_data(MPN)
+        assert data.mpn == MPN
+        assert calls == [0], "no extra request when page one already matches"
+
+    def test_exact_match_found_on_a_later_page(self) -> None:
+        """A part beyond the first window is found rather than called missing."""
+        calls: list[int] = []
+        fillers = [f"DECOY-{i}" for i in range(50)]
+
+        def dispatch(url: str, **kwargs: Any) -> Any:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            offset = kwargs["json"]["Offset"]
+            calls.append(offset)
+            if offset == 0:
+                return response(200, self._page(fillers))
+            return response(200, self._page([MPN]))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = dispatch
+        data = provider.fetch_component_data(MPN)
+        assert data.mpn == MPN
+        assert calls == [0, 50], "paged forward exactly once"
+
+    def test_paging_stops_on_a_short_final_page(self) -> None:
+        """A partial page means there is nothing further to fetch."""
+        calls: list[int] = []
+
+        def dispatch(url: str, **kwargs: Any) -> Any:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            offset = kwargs["json"]["Offset"]
+            calls.append(offset)
+            # Only three candidates, so this is the last page.
+            return response(200, self._page(["A", "B", "C"], total=3))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = dispatch
+        with pytest.raises(PartNotFoundError):
+            provider.fetch_component_data(MPN)
+        assert calls == [0], "did not request a page beyond a short response"
+
+    def test_paging_is_bounded(self) -> None:
+        """An endless run of full pages is abandoned, not followed forever."""
+
+        def dispatch(url: str, **kwargs: Any) -> Any:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            # Always a full page of decoys and never the wanted part.
+            return response(200, self._page([f"DECOY-{i}" for i in range(50)]))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = dispatch
+        with pytest.raises(PartNotFoundError):
+            provider.fetch_component_data(MPN)
+        assert session_of(provider).post.call_count == 1 + _MAX_PAGES
+
+    def test_offset_advances_by_the_page_size(self) -> None:
+        """Each request asks for the next window, not the same one again."""
+        offsets: list[int] = []
+
+        def dispatch(url: str, **kwargs: Any) -> Any:
+            if url == TOKEN_URL:
+                return response(200, TOKEN_PAYLOAD)
+            offsets.append(kwargs["json"]["Offset"])
+            return response(200, self._page([f"DECOY-{i}" for i in range(50)]))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = dispatch
+        with pytest.raises(PartNotFoundError):
+            provider.fetch_component_data(MPN)
+        assert offsets == [0, 50, 100, 150]
 
 
 class TestRequestShape(CapturedPayloads):

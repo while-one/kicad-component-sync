@@ -185,6 +185,11 @@ discrete `Min`/`Max` pairs, never as one free-text field.
 | Written field | Source |
 | --- | --- |
 | `Value` | derived from the type parameter, for **discrete passives only** (see below) |
+
+Properties this tool **adds** are written with `(hide yes)` and parked at
+`(at 0 0 0)`, so they never appear on the schematic. Properties that already
+exist keep whatever visibility the author gave them: an edit splices only the
+value and never rewrites the surrounding block.
 | `Manufacturer`, `Description`, `Datasheet`, `Package` | vendor record |
 | `Digikey` | the product URL exactly as the API returned it |
 | `Temperature Min` / `Temperature Max` | a range such as `-55/+150 C` or `-55 C / +85 C` |
@@ -311,7 +316,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 216 tests
+python -m pytest -q                     # 225 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

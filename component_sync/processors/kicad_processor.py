@@ -43,6 +43,14 @@ MANAGED_FIELDS = (
 )
 
 #: KiCad writes these fields at a zeroed position because they are hidden.
+#: Placement used for properties this tool adds.
+#:
+#: ``(at 0 0 0)`` parks the field at the origin and ``(hide yes)`` keeps it off
+#: the schematic. Without ``(hide yes)`` KiCad renders the field's text on the
+#: sheet, so a run that added ``Digikey`` and ``Voltage Rating`` to 55 symbols
+#: would bury the drawing under fields the author never asked to see. Fields that
+#: already exist keep whatever visibility they were given, because an edit only
+#: splices the value and never rewrites the surrounding block.
 _HIDDEN_AT = "(at 0 0 0)"
 
 
@@ -229,6 +237,7 @@ class KiCadSymProcessor(BaseProcessor):
                 f"\t\t\t{_HIDDEN_AT}\n"
                 f"\t\t\t(show_name no)\n"
                 f"\t\t\t(do_not_autoplace no)\n"
+                f"\t\t\t(hide yes)\n"
                 f"\t\t\t(effects\n"
                 f"\t\t\t\t(font\n"
                 f"\t\t\t\t\t(size 1.27 1.27)\n"

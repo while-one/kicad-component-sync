@@ -543,3 +543,100 @@ class TestAtomicWrite:
 
         assert path.read_text() == "original"
         assert [p.name for p in tmp_path.iterdir()] == ["f.txt"]
+
+
+class TestPropertyVisibility:
+    """Properties this tool adds must not appear on the schematic.
+
+    KiCad renders a property's text on the sheet unless the block carries
+    ``(hide yes)``. A run that added ``Digikey`` and ``Voltage Rating`` to 55
+    symbols without it buried the drawing under fields nobody asked to see.
+    """
+
+    def _library(self, tmp_path: Path, text: str) -> Path:
+        """Write a library and return its path.
+
+        Args:
+            tmp_path: pytest temporary directory.
+            text: Library source.
+
+        Returns:
+            Path to the written library.
+        """
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_added_property_is_hidden(
+        self, tmp_path: Path, kicad_sym_text: str, stub_provider: StubProvider
+    ) -> None:
+        """A newly added field carries ``(hide yes)``."""
+        stub_provider.catalogue[CAP.mpn] = ComponentData(
+            mpn=CAP.mpn, manufacturer="Murata", package="0402"
+        )
+        path = self._library(tmp_path, kicad_sym_text)
+
+        KiCadSymProcessor(stub_provider).process(path)
+
+        written = path.read_text(encoding="utf-8")
+        assert '(property "Package" "0402"' in written
+        block = written.split('(property "Package" "0402"', 1)[1].split("\n\t\t)", 1)[0]
+        assert "(hide yes)" in block
+        assert "(at 0 0 0)" in block
+
+    def test_existing_property_keeps_its_visibility(
+        self, tmp_path: Path, stub_provider: StubProvider
+    ) -> None:
+        """Editing an existing field must not change how it is displayed."""
+        visible = (
+            "(kicad_symbol_lib\n"
+            '\t(version 20231120)\n'
+            '\t(symbol "VISIBLE"\n'
+            '\t\t(property "Reference" "R"\n'
+            "\t\t\t(at 0 0 0)\n"
+            "\t\t)\n"
+            '\t\t(property "Part" "RC0402FR-0710KL"\n'
+            "\t\t\t(at 0 0 0)\n"
+            "\t\t\t(show_name no)\n"
+            "\t\t\t(do_not_autoplace no)\n"
+            "\t\t\t(effects\n"
+            "\t\t\t\t(font\n"
+            "\t\t\t\t\t(size 1.27 1.27)\n"
+            "\t\t\t\t)\n"
+            "\t\t\t)\n"
+            "\t\t)\n"
+            "\t)\n"
+            ")\n"
+        )
+        stub_provider.catalogue["RC0402FR-0710KL"] = ComponentData(
+            mpn="RC0402FR-0710KL", manufacturer="YAGEO"
+        )
+        path = self._library(tmp_path, visible)
+
+        result = KiCadSymProcessor(stub_provider).process(path)
+
+        assert [c.field_name for c in result.changes] == ["Manufacturer"]
+        written = path.read_text(encoding="utf-8")
+        # Scope to the Part block alone; the added Manufacturer property follows
+        # it and legitimately carries (hide yes).
+        part_block = written.split('(property "Part"', 1)[1].split("\n\t\t)", 1)[0]
+        assert "(hide yes)" not in part_block, (
+            "an existing field's visibility must be left alone"
+        )
+        added = written.split('(property "Manufacturer"', 1)[1].split("\n\t\t)", 1)[0]
+        assert "YAGEO" in added
+        assert "(hide yes)" in added, "the newly added field is hidden"
+
+    def test_hide_precedes_effects_as_kicad_writes_it(
+        self, tmp_path: Path, kicad_sym_text: str, stub_provider: StubProvider
+    ) -> None:
+        """Flag order matches the surrounding library so KiCad round-trips it."""
+        stub_provider.catalogue[CAP.mpn] = ComponentData(mpn=CAP.mpn, package="0402")
+        path = self._library(tmp_path, kicad_sym_text)
+
+        KiCadSymProcessor(stub_provider).process(path)
+
+        written = path.read_text(encoding="utf-8")
+        block = written.split('(property "Package"', 1)[1].split("\n\t\t)", 1)[0]
+        assert block.index("(do_not_autoplace no)") < block.index("(hide yes)")
+        assert block.index("(hide yes)") < block.index("(effects")

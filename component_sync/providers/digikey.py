@@ -74,11 +74,24 @@ _PASSIVE_CATEGORIES = frozenset(
     }
 )
 
-#: How many candidates to request per search.
+#: How many candidates to request per search page.
 #:
-#: A part number occasionally returns several products that differ only by
-#: packaging, so more than one is needed for the exact-match selection below.
-_SEARCH_LIMIT = 10
+#: 50 is the largest value the API accepts; anything higher is rejected with
+#: HTTP 400. This matters more than it looks. The search is a fuzzy, tokenised
+#: match, so a short numeric part number can return tens of thousands of
+#: candidates: querying ``1028`` returns 19,963 products, and the Keystone part
+#: of that number sits around position 50. With a limit of 10 it fell outside the
+#: window and the part was reported as missing when it is in fact stocked.
+_SEARCH_LIMIT = 50
+
+#: How many pages to walk when the first page holds no exact match.
+#:
+#: Paging is only reached when a part genuinely is not on page one, so it costs
+#: nothing for the common case of a distinctive part number that matches
+#: immediately. The cap keeps a query such as a bare ``1028`` from walking all
+#: 19,963 results, and a part not found within the window is honestly reported
+#: as missing rather than guessed at.
+_MAX_SEARCH_PAGES = 4
 
 
 class DigiKeyProvider(BaseProvider):
@@ -197,35 +210,71 @@ class DigiKeyProvider(BaseProvider):
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
-        body = {"Keywords": mpn, "Limit": _SEARCH_LIMIT, "Offset": 0}
-
-        try:
-            response = self._session.post(
-                PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
-            )
-        except requests.RequestException as exc:
-            raise ProviderAPIError(f"DigiKey search failed for {mpn!r}: {exc}") from exc
-
-        if response.status_code == 404:
-            raise PartNotFoundError(mpn)
-        if response.status_code != 200:
-            detail = response.text[:200].replace("\n", " ")
-            raise ProviderAPIError(
-                f"DigiKey search for {mpn!r} failed with HTTP "
-                f"{response.status_code}: {detail}"
-            )
-
-        try:
-            payload: dict[str, Any] = response.json()
-        except ValueError as exc:
-            raise ProviderAPIError(f"Malformed DigiKey response for {mpn!r}: {exc}") from exc
-
-        products = payload.get("Products") or []
-        match = self._select_exact(products, mpn)
+        match = self._search(mpn, headers)
         if match is None:
             raise PartNotFoundError(mpn)
-
         return self._to_component_data(mpn, match)
+
+    def _search(self, mpn: str, headers: dict[str, str | None]) -> dict[str, Any] | None:
+        """Return the product whose MPN matches ``mpn`` exactly, paging if needed.
+
+        The first page is always fetched, so a distinctive part number costs one
+        request. Only when no exact match is present does the search walk further
+        pages, up to :data:`_MAX_SEARCH_PAGES`.
+
+        Args:
+            mpn: The manufacturer part number to look for.
+            headers: Authenticated request headers.
+
+        Returns:
+            The matching product record, or ``None`` when none was found.
+
+        Raises:
+            PartNotFoundError: If the API itself reports the path as unknown.
+            ProviderAPIError: If any request fails.
+        """
+        for page in range(_MAX_SEARCH_PAGES):
+            body = {
+                "Keywords": mpn,
+                "Limit": _SEARCH_LIMIT,
+                "Offset": page * _SEARCH_LIMIT,
+            }
+            try:
+                response = self._session.post(
+                    PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
+                )
+            except requests.RequestException as exc:
+                raise ProviderAPIError(f"DigiKey search failed for {mpn!r}: {exc}") from exc
+
+            if response.status_code == 404:
+                raise PartNotFoundError(mpn)
+            if response.status_code != 200:
+                detail = response.text[:200].replace("\n", " ")
+                raise ProviderAPIError(
+                    f"DigiKey search for {mpn!r} failed with HTTP "
+                    f"{response.status_code}: {detail}"
+                )
+
+            try:
+                payload: dict[str, Any] = response.json()
+            except ValueError as exc:
+                raise ProviderAPIError(
+                    f"Malformed DigiKey response for {mpn!r}: {exc}"
+                ) from exc
+
+            products = payload.get("Products") or []
+            match = self._select_exact(products, mpn)
+            if match is not None:
+                if page:
+                    LOGGER.debug(
+                        "Found exact match for %r on page %d of DigiKey results", mpn, page + 1
+                    )
+                return match
+
+            if len(products) < _SEARCH_LIMIT:
+                # A short page is the last page; there is nothing more to fetch.
+                break
+        return None
 
     def close(self) -> None:
         """Close the underlying HTTP session if this provider created it."""
