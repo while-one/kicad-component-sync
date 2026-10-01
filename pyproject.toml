@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "component-sync"
+version = "0.1.0"
+description = "Enrich CSV BOMs and KiCad symbol libraries with distributor parametric data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["requests>=2.31"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "mypy>=1.8", "types-requests"]
+
+[project.scripts]
+component-sync = "component_sync.cli:main"
+
+[project.entry-points."kicad.plugin"]
+component_sync = "component_sync.plugin:register"
+
+[tool.setuptools.packages.find]
+include = ["component_sync*"]
+
+[tool.pytest.ini_options]
+testpaths = ["component_sync/tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# `wx` is only importable inside the KiCad application and ships no stubs.
+module = ["wx", "pcbnew"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `requests` is a hard runtime dependency; stubs are a dev extra.
+module = ["requests"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D", "UP", "B", "ANN"]
+# D406/D407/D413 demand NumPy-style "Section\n-----" underlines, which conflicts
+# with the Google-style docstrings this project is required to use.
+# ANN101/ANN102 demand annotations for self/cls, which Google style omits.
+ignore = ["D203", "D213", "D406", "D407", "D413", "ANN101", "ANN102"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately use Any for mock payloads and fixtures.
+"**/tests/*" = ["D103", "ANN", "D105"]
+# KiCad's embedded API ships no type information; `Any` is the only honest
+# annotation for its symbol and frame objects.
+"component_sync/plugin.py" = ["ANN401"]

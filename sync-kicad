@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Sync a KiCad symbol library or CSV BOM with distributor parameters.
+#
+# Usage:
+#   sync-kicad <file.kicad_sym | file.csv> [--dry-run]
+#
+# Environment:
+#   DIGIKEY_CLIENT_ID      required unless --client-id is given
+#   DIGIKEY_CLIENT_SECRET  required unless --client-secret is given
+#
+# For a .kicad_sym input this runs against the file on disk, so save the library
+# in the Symbol Editor first, then refresh it there afterwards
+# (Tools -> Refresh Symbol Libraries).
+
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+    echo "usage: $(basename "$0") <file.kicad_sym|file.csv> [--dry-run]" >&2
+    exit 2
+fi
+
+target="$1"
+shift || true
+
+pkg_dir="${COMPONENT_SYNC_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+
+if [[ -n "${DIGIKEY_CLIENT_ID:-}" && -n "${DIGIKEY_CLIENT_SECRET:-}" ]]; then
+    status="credentials: environment"
+else
+    status="credentials: MISSING (set DIGIKEY_CLIENT_ID / DIGIKEY_CLIENT_SECRET)"
+fi
+
+printf 'component-sync\n' >&2
+printf '  target : %s\n' "$target" >&2
+printf '  %s\n' "$status" >&2
+printf '  mode   : %s\n' "${1:-write}" >&2
+echo >&2
+
+exec python3 -m component_sync.cli "$target" "$@"
