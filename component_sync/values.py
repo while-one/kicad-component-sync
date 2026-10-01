@@ -140,12 +140,40 @@ def _parse_number(text: str) -> tuple[float, str] | None:
 _BASE_UNITS = frozenset({"ohm", "ohms", "hertz", "farad", "f", "henry", "h"})
 
 
+#: Characters a distributor may use for the micro prefix.
+#:
+#: DigiKey sends the micro sign (U+00B5), the Greek small letter mu (U+03BC) is
+#: also in circulation, and hand-written BOMs use a plain ``u``. All three mean
+#: the same thing, and treating them as different would misread ``0.1 µF`` as
+#: 0.1 farads, which then renders as the plausible-looking ``100 mF`` instead of
+#: the correct ``100 nF``. Input is therefore folded onto ASCII ``u``; output
+#: stays ASCII too, so the library contains no exotic characters.
+_MICRO_CHARACTERS = ("\u00b5", "\u03bc")
+
+
+def _fold_micro(text: str) -> str:
+    """Replace every micro-prefix character with a plain ASCII ``u``.
+
+    Args:
+        text: A unit suffix as written by a distributor or a human.
+
+    Returns:
+        The suffix with all micro characters replaced by ``u``.
+    """
+    for character in _MICRO_CHARACTERS:
+        text = text.replace(character, "u")
+    return text
+
+
 def _si_scale(suffix: str, multipliers: dict[str, str]) -> float:
     """Return the multiplier implied by a unit suffix.
 
     Case is significant and is preserved from the source: ``"MOhm"`` is
     mega-ohm while ``"mOhm"`` is milli-ohm. Compound units are resolved
     longest-prefix-first so ``"kOhms"`` reads as kilo.
+
+    The micro prefix is matched as ``u``, ``µ`` or ``μ``, because vendors do not
+    agree on which character to send.
 
     Args:
         suffix: The suffix exactly as written, for example ``"kOhms"``.
@@ -162,11 +190,13 @@ def _si_scale(suffix: str, multipliers: dict[str, str]) -> float:
         if suffix.casefold() == unit.casefold():
             return 1.0
 
+    folded = _fold_micro(suffix)
+
     # Longest prefix wins, matched case-sensitively so "M" != "m".
     for scale, prefix in sorted(_SUFFIXES, key=lambda item: -len(item[1])):
         if not prefix:
             continue
-        if suffix.startswith(prefix):
+        if folded.startswith(prefix):
             return scale
     return 1.0
 

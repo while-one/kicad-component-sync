@@ -144,7 +144,7 @@ discrete `Min`/`Max` pairs, never as one free-text field.
 
 | Written field | Source |
 | --- | --- |
-| `Value` | derived from the type parameter (see below) |
+| `Value` | derived from the type parameter, for **discrete passives only** (see below) |
 | `Manufacturer`, `Description`, `Datasheet`, `Package` | vendor record |
 | `Digikey` | the product URL exactly as the API returned it |
 | `Temperature Min` / `Temperature Max` | a range such as `-55/+150 C` or `-55 C / +85 C` |
@@ -191,6 +191,42 @@ When a part exposes none of those parameters — an IC, connector or switch —
 conventionally carry the part number as their value, and overwriting it would
 destroy them.
 
+### Value is derived only for discrete passives
+
+Having a `Capacitance`, `Resistance`, `Inductance` or `Frequency` parameter is
+**not** enough on its own. The NFC reader `PN7160A1HN/C100E` publishes
+`Frequency = 13.56MHz`, and the cellular module `BG95M3LA-64-SGNS` publishes its
+supported bands; deriving from parameters alone would replace their part numbers
+with `13.56 MHz` and a frequency list.
+
+Derivation is therefore gated on the distributor's own category taxonomy —
+`Capacitors`, `Resistors`, `Inductors, Coils, Chokes`,
+`Crystals, Oscillators, Resonators`. Everything else, including
+`RF and Wireless` and `Integrated Circuits (ICs)`, keeps its existing `Value`
+and gains only package, ranges and links.
+
+## Verified against the live API
+
+The DigiKey integration is checked against **captured production responses**,
+stored in `component_sync/tests/fixtures/digikey_search.json`, not against
+invented payloads. That distinction matters more than it sounds: the provider was
+originally written against a hand-guessed response shape, and its 374 lines of
+tests all passed while the code was unable to read a single real part.
+
+| Bug | Symptom |
+| --- | --- |
+| `GET /products/v4/search/{mpn}` | The real endpoint is `POST /products/v4/search/keyword`. Every request 404'd, so **every part in the library reported as missing** |
+| `Parameter` / `Value` | Real keys are `ParameterText` / `ValueText`, so `raw_parameters` was always empty — no `Value`, no ranges, ever |
+| `Description` read as a string | It is an object; the library received a Python dict repr |
+| `Datasheet` | The field is `DatasheetUrl`, and is often protocol-relative `//host/...` |
+| `Package` | Not a top-level field; it lives in the `Package / Case` parameter |
+| `"Voltage - Supply"` | Punctuation normalisation produced `voltage___supply`, matching nothing |
+| micro prefix | DigiKey sends U+00B5 `µ`; only ASCII `u` was recognised, so `0.1 µF` became `100 mF` |
+| `-` placeholders | Inapplicable parameters were written as real values |
+
+Run against the real library this now reports **264 changes and 4 unresolved
+parts**, against 24 unresolved before, with the file left byte-identical.
+
 ### URLs are never synthesised
 
 `Digikey` is written only when the API returns a `ProductUrl`. A hand-built URL
@@ -230,11 +266,12 @@ the CLI automatically.
   plus description). These miss, and are reported under *Parts not found*, which
   is where the author discovers them. The tool deliberately does not guess: every
   normalisation that would "fix" this one breaks a real part elsewhere.
+  `RC0402JR-7D0RL` is a genuine miss — DigiKey returns 200 with no products.
 
 ## Development
 
 ```bash
-python -m pytest -q                     # 165 tests
+python -m pytest -q                     # 181 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

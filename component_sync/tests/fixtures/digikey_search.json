@@ -1,0 +1,1810 @@
+{
+ "GRM155R61C104KA88D": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "CAP CER 0.1UF 16V X5R 0402",
+    "DetailedDescription": "0.1 µF ±10% 16V Ceramic Capacitor X5R 0402 (1005 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 490,
+    "Name": "Murata Electronics"
+   },
+   "ManufacturerProductNumber": "GRM155R61C104KA88D",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/murata-electronics/GRM155R61C104KA88D/2175201",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/490_Chip_Multilayer_CAT2021_MLCC.pdf",
+   "QuantityAvailable": 3078502,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "0.1 µF",
+     "ValueText": "0.1 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 14,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "String",
+     "ValueId": "108742",
+     "ValueText": "16V"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "422407",
+     "ValueText": "X5R"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "243000",
+     "ValueText": "-55°C ~ 85°C"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 405,
+     "ParameterText": "Applications",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409416",
+     "ValueText": "Surface Mount, MLCC"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1501,
+     "ParameterText": "Thickness (Max)",
+     "ParameterType": "String",
+     "ValueId": "5314",
+     "ValueText": "0.022\" (0.55mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 4,
+     "ParameterText": "Lead Style",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 179458,
+    "Name": "GRM155R61C"
+   },
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 60,
+      "ParentId": 3,
+      "Name": "Ceramic Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/365/960/CGA-Series-0402-%281005-Metric%29_tmb.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Ceramic capacitors consist of two or more alternating layers of ceramic material as the dielectric and metal layers acting as the non-polarized electrodes. Applications include automotive, bypass, decoupling, filtering, RF, and ESD protection. Through-hole versions are often disc or \"blob\" shaped with two wire leads.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "RC0402FR-0710KL": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "RES 10K OHM 1% 1/16W 0402",
+    "DetailedDescription": "10 kOhms ±1% 0.063W, 1/16W Chip Resistor 0402 (1005 Metric) Moisture Resistant Thick Film"
+   },
+   "Manufacturer": {
+    "Id": 13,
+    "Name": "YAGEO"
+   },
+   "ManufacturerProductNumber": "RC0402FR-0710KL",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/yageo/RC0402FR-0710KL/726523",
+   "DatasheetUrl": "https://yageogroup.com/content/datasheet/asset/file/PYU-RC_GROUP_51_ROHS_L",
+   "QuantityAvailable": 5430041,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "10 kOhms",
+     "ValueText": "10 kOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "7854",
+     "ValueText": "0.063W, 1/16W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "411742",
+     "ValueText": "Thick Film"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "376928",
+     "ValueText": "Moisture Resistant"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "1378",
+     "ValueText": "±100ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242934",
+     "ValueText": "-55°C ~ 155°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39157",
+     "ValueText": "0402"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "4914",
+     "ValueText": "0.016\" (0.40mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "RC0402FR-0736K5L": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "RES 36.5K OHM 1% 1/16W 0402",
+    "DetailedDescription": "36.5 kOhms ±1% 0.063W, 1/16W Chip Resistor 0402 (1005 Metric) Moisture Resistant Thick Film"
+   },
+   "Manufacturer": {
+    "Id": 13,
+    "Name": "YAGEO"
+   },
+   "ManufacturerProductNumber": "RC0402FR-0736K5L",
+   "UnitPrice": 0.1,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/yageo/RC0402FR-0736K5L/5280995",
+   "DatasheetUrl": "https://yageogroup.com/content/datasheet/asset/file/PYU-RC_GROUP_51_ROHS_L",
+   "QuantityAvailable": 2771,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 2085,
+     "ParameterText": "Resistance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "36.5 kOhms",
+     "ValueText": "36.5 kOhms"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1131",
+     "ValueText": "±1%"
+    },
+    {
+     "ParameterId": 2,
+     "ParameterText": "Power (Watts)",
+     "ParameterType": "String",
+     "ValueId": "7854",
+     "ValueText": "0.063W, 1/16W"
+    },
+    {
+     "ParameterId": 174,
+     "ParameterText": "Composition",
+     "ParameterType": "String",
+     "ValueId": "411742",
+     "ValueText": "Thick Film"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "376928",
+     "ValueText": "Moisture Resistant"
+    },
+    {
+     "ParameterId": 17,
+     "ParameterText": "Temperature Coefficient",
+     "ParameterType": "String",
+     "ValueId": "1378",
+     "ValueText": "±100ppm/°C"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242934",
+     "ValueText": "-55°C ~ 155°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39158",
+     "ValueText": "0402 (1005 Metric)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "39157",
+     "ValueText": "0402"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "6310",
+     "ValueText": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "4914",
+     "ValueText": "0.016\" (0.40mm)"
+    },
+    {
+     "ParameterId": 1127,
+     "ParameterText": "Number of Terminations",
+     "ParameterType": "Double",
+     "ValueId": "2",
+     "ValueText": "2"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 2,
+    "ParentId": 0,
+    "Name": "Resistors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/639/316/FVT%20SERIES_tmb%2864x64%29.jpg",
+    "SeoDescription": "Products within this category include fixed-value (non-adjustable) resistors and related mounting accessories, organized according to their physical form factor or the method by which they are physically and electrically connected within an end application. Adjustable or variable-value resistors (also known as potentiometers or rheostats) are found separately, in a category of their own.",
+    "ChildCategories": [
+     {
+      "CategoryId": 52,
+      "ParentId": 2,
+      "Name": "Chip Resistor - Surface Mount",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/683/989/MFG_RMC%20SERIES_tmb%2864x64%29.jpg",
+      "SeoDescription": "Resistors provide opposition to current flow, in a manner that is proportional to the electric potential (voltage) imposed across them, and which is ideally unaffected by signal frequency or changes in temperature. Resistors described as surface mount chip types are designed to be affixed to the surface of a printed circuit board and incorporate a single resistor per device package.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "TXS0108EPWR": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 2,
+  "_product": {
+   "Description": {
+    "ProductDescription": "IC XLTR VL BIDIR 20-TSSOP",
+    "DetailedDescription": "Voltage Level Translator Bidirectional 1 Circuit 8 Channel 60Mbps 20-TSSOP"
+   },
+   "Manufacturer": {
+    "Id": 296,
+    "Name": "Texas Instruments"
+   },
+   "ManufacturerProductNumber": "TXS0108EPWR",
+   "UnitPrice": 1.82,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/TXS0108EPWR/1775302",
+   "DatasheetUrl": "https://www.ti.com/lit/gpn/txs0108e",
+   "QuantityAvailable": 62923,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 1911,
+     "ParameterText": "Translator Type",
+     "ParameterType": "String",
+     "ValueId": "420167",
+     "ValueText": "Voltage Level"
+    },
+    {
+     "ParameterId": 1762,
+     "ParameterText": "Channel Type",
+     "ParameterType": "String",
+     "ValueId": "319712",
+     "ValueText": "Bidirectional"
+    },
+    {
+     "ParameterId": 2094,
+     "ParameterText": "Number of Circuits",
+     "ParameterType": "Double",
+     "ValueId": "1",
+     "ValueText": "1"
+    },
+    {
+     "ParameterId": 1912,
+     "ParameterText": "Channels per Circuit",
+     "ParameterType": "String",
+     "ValueId": "281410",
+     "ValueText": "8"
+    },
+    {
+     "ParameterId": 1913,
+     "ParameterText": "Voltage - VCCA",
+     "ParameterType": "RangeUnitOfMeasure",
+     "ValueId": "1.4 V ~ 3.6 V",
+     "ValueText": "1.4 V ~ 3.6 V"
+    },
+    {
+     "ParameterId": 1914,
+     "ParameterText": "Voltage - VCCB",
+     "ParameterType": "RangeUnitOfMeasure",
+     "ValueId": "1.65 V ~ 5.5 V",
+     "ValueText": "1.65 V ~ 5.5 V"
+    },
+    {
+     "ParameterId": 1915,
+     "ParameterText": "Input Signal",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1817,
+     "ParameterText": "Output Signal",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 41,
+     "ParameterText": "Output Type",
+     "ParameterType": "String",
+     "ValueId": "382149",
+     "ValueText": "Open Drain, Push-Pull"
+    },
+    {
+     "ParameterId": 448,
+     "ParameterText": "Data Rate",
+     "ParameterType": "String",
+     "ValueId": "257358",
+     "ValueText": "60Mbps"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212621",
+     "ValueText": "-40°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "316836",
+     "ValueText": "Auto-Direction Sensing"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "143757",
+     "ValueText": "20-TSSOP (0.173\", 4.40mm Width)"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "143756",
+     "ValueText": "20-TSSOP"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 60464,
+    "Name": "TXS0108"
+   },
+   "Category": {
+    "CategoryId": 32,
+    "ParentId": 0,
+    "Name": "Integrated Circuits (ICs)",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/153/598/8-SOIC%2CM8_tmb.jpg",
+    "SeoDescription": "Integrated circuits combine a large number of transistors and other elementary electronic components in miniaturized form into a single physical device, that is designed for a specific purpose or function and characterized by its performance of that function rather than by the behavior of its component pieces. Examples include microcontrollers, battery monitors and charge controllers, analog to digital converters, operational amplifiers, logic gates, voltage regulators, gate drivers, motro controllers, and others.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2019,
+      "ParentId": 32,
+      "Name": "Logic",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/312/8-TSSOP%2C-8-MSOP-3x3mm_tmb.jpg",
+      "SeoDescription": "Logic components operate using two voltage levels. These two levels are referred to as High or Low, On or Off, True or False, or simply 1 or 0. There are many components included in this category, such as Buffers, Drivers, Receivers, Transceivers, Comparators, Counters, Dividers, FIFOs Memory, Flip Flops, Gates, Inverters, Latches, Multivibrators, Parity Generators, Shift Registers, Signal Switches, Multiplexers, Decoders, Translators, Level Shifters, Universal Bus FUnctions, and More.",
+      "ChildCategories": [
+       {
+        "CategoryId": 732,
+        "ParentId": 2019,
+        "Name": "Translators, Level Shifters",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/010/202/019/12-UCSP_21-0101H_tmb.jpg",
+        "SeoDescription": "Logic translator or level shifter ICs are devices used to pass information between digital logic devices that are operating from different/incompatible supply voltages, or which implement different signaling methods. Examples might include the connection of a digital-output sensor requiring a 5 V supply to an FPGA with a 3.3 V I/O supply, or converting between single-ended signaling methods like CMOS or TTL and differential techniques, such as PECL or LVDS.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "MLJ1608WR56KT000": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "FIXED IND 560NH 400MA 520 MOHM",
+    "DetailedDescription": "560 nH Shielded Multilayer Inductor 400 mA 520mOhm Max 0603 (1608 Metric)"
+   },
+   "Manufacturer": {
+    "Id": 445,
+    "Name": "TDK"
+   },
+   "ManufacturerProductNumber": "MLJ1608WR56KT000",
+   "UnitPrice": 0.2,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/tdk/MLJ1608WR56KT000/5813295",
+   "DatasheetUrl": "https://product.tdk.com/en/system/files?file=dam/doc/product/inductor/inductor/smd/catalog/inductor_commercial_standard_mlj1608_en.pdf",
+   "QuantityAvailable": 4151,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "378196",
+     "ValueText": "Multilayer"
+    },
+    {
+     "ParameterId": 1221,
+     "ParameterText": "Material - Core",
+     "ParameterType": "String",
+     "ValueId": "346647",
+     "ValueText": "Ferrite"
+    },
+    {
+     "ParameterId": 2087,
+     "ParameterText": "Inductance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "560 nH",
+     "ValueText": "560 nH"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1340",
+     "ValueText": "±10%"
+    },
+    {
+     "ParameterId": 2088,
+     "ParameterText": "Current Rating (Amps)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "400 mA",
+     "ValueText": "400 mA"
+    },
+    {
+     "ParameterId": 1219,
+     "ParameterText": "Current - Saturation (Isat)",
+     "ParameterType": "String",
+     "ValueId": "243193",
+     "ValueText": "550mA"
+    },
+    {
+     "ParameterId": 80,
+     "ParameterText": "Shielding",
+     "ParameterType": "String",
+     "ValueId": "402031",
+     "ValueText": "Shielded"
+    },
+    {
+     "ParameterId": 314,
+     "ParameterText": "DC Resistance (DCR)",
+     "ParameterType": "String",
+     "ValueId": "240223",
+     "ValueText": "520mOhm Max"
+    },
+    {
+     "ParameterId": 705,
+     "ParameterText": "Q @ Freq",
+     "ParameterType": "String",
+     "ValueId": "192081",
+     "ValueText": "35 @ 25MHz"
+    },
+    {
+     "ParameterId": 706,
+     "ParameterText": "Frequency - Self Resonant",
+     "ParameterType": "String",
+     "ValueId": "110626",
+     "ValueText": "170MHz"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 1222,
+     "ParameterText": "Inductance Frequency - Test",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "25 MHz",
+     "ValueText": "25 MHz"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "39246",
+     "ValueText": "0603 (1608 Metric)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "7802",
+     "ValueText": "0.063\" L x 0.031\" W (1.60mm x 0.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "6123",
+     "ValueText": "0.037\" (0.94mm)"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 4,
+    "ParentId": 0,
+    "Name": "Inductors, Coils, Chokes",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/465/830/760308104119_tmb%2864x64%29.jpg",
+    "SeoDescription": "Inductors, coils, and chokes are various names used to refer to products that store energy in the form of a magnetic field. The vast majority of the products found in this category are simple fixed-value devices, though adjustable types, products for wireless power transmission, and magnetically-coupled inductor arrays are also included. Note that the coupled-inductor devices found within this product family are characterized by having multiple identical windings sharing a common magnetic core; similar products with non-identical windings are more commonly described as transformers, and are categorized as such.",
+    "ChildCategories": [
+     {
+      "CategoryId": 71,
+      "ParentId": 4,
+      "Name": "Fixed Inductors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/690/369/MFG_WE-HCF%202013%20Series_tmb%2864x64%29.jpg",
+      "SeoDescription": "An inductor, also known as a coil, choke, or reactor, is a passive two-terminal electrical component that stores energy in a magnetic field when electric current flows through it. When the current changes, the magnetic field induces a voltage in the conductor. The induced voltage has a polarity which opposes the change in current that created it. The unit of inductance is the Henry (H). Mounting options include surface, through-hole, and chassis.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "CX3225GA16000D0PTVCC": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "CRYSTAL 16.0000MHZ 8PF SMD",
+    "DetailedDescription": "16 MHz ±50ppm Crystal 8pF 100 Ohms 2-SMD, No Lead"
+   },
+   "Manufacturer": {
+    "Id": 478,
+    "Name": "KYOCERA AVX"
+   },
+   "ManufacturerProductNumber": "CX3225GA16000D0PTVCC",
+   "UnitPrice": 0.92,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/kyocera-avx/CX3225GA16000D0PTVCC/4453853",
+   "DatasheetUrl": "https://ele.kyocera.com/assets/products/crystal-device/cx3225ga_e.pdf",
+   "QuantityAvailable": 18276,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "375145",
+     "ValueText": "MHz Crystal"
+    },
+    {
+     "ParameterId": 2150,
+     "ParameterText": "Frequency",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "16 MHz",
+     "ValueText": "16 MHz"
+    },
+    {
+     "ParameterId": 253,
+     "ParameterText": "Frequency Stability",
+     "ParameterType": "String",
+     "ValueId": "1554",
+     "ValueText": "±150ppm"
+    },
+    {
+     "ParameterId": 537,
+     "ParameterText": "Frequency Tolerance",
+     "ParameterType": "String",
+     "ValueId": "2614",
+     "ValueText": "±50ppm"
+    },
+    {
+     "ParameterId": 35,
+     "ParameterText": "Load Capacitance",
+     "ParameterType": "String",
+     "ValueId": "294760",
+     "ValueText": "8pF"
+    },
+    {
+     "ParameterId": 2082,
+     "ParameterText": "ESR (Equivalent Series Resistance)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 Ohms",
+     "ValueText": "100 Ohms"
+    },
+    {
+     "ParameterId": 538,
+     "ParameterText": "Operating Mode",
+     "ParameterType": "String",
+     "ValueId": "349771",
+     "ValueText": "Fundamental"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212507",
+     "ValueText": "-40°C ~ 150°C"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "312105",
+     "ValueText": "AEC-Q200"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "168669",
+     "ValueText": "2-SMD, No Lead"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "842623",
+     "ValueText": "2-SMD (3.2x2.5)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "10964",
+     "ValueText": "0.126\" L x 0.098\" W (3.20mm x 2.50mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "6126",
+     "ValueText": "0.037\" (0.95mm)"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 12,
+    "ParentId": 0,
+    "Name": "Crystals, Oscillators, Resonators",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/140/638/4-SMD_2.0x1.6_tmb.jpg",
+    "SeoDescription": "Crystal, oscillator, and resonator products are devices used as sources or references for frequency generation and time measurement. Based in most cases on the physical vibration of some mechanical structure that vibrates at a known frequency, they are further classified along lines of their specific implementation and the degree to which additional supporting functions are incorporated, enabling convenience of use or higher attainable degrees of precision and/or accuracy.",
+    "ChildCategories": [
+     {
+      "CategoryId": 171,
+      "ParentId": 12,
+      "Name": "Crystals",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/142/959/MFG_4606_C1_tmb%2864x64%29.jpg",
+      "SeoDescription": "Crystal products are passive components most commonly used as time or frequency references in electronic systems. Consisting of a piezoelectric crystal that mechanically vibrates at a known frequency, their use requires provision of an external oscillator circuit with carefully designed capacitance, drive voltage, and series resistance characteristics, to generate a signal at the indicated crystal frequency that operates successfully over the operating temperature range, without damaging the crystal element. Active devices which integrate this additional necessary circuitry are considered oscillators and are catalogued separately.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "TAJB107M006RNJ": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 2,
+  "_product": {
+   "Description": {
+    "ProductDescription": "CAP TANT 100UF 20% 6.3V 1411",
+    "DetailedDescription": "100 µF Molded Tantalum Capacitors 6.3 V 1411 (3528 Metric), 1210 1.7Ohm"
+   },
+   "Manufacturer": {
+    "Id": 478,
+    "Name": "KYOCERA AVX"
+   },
+   "ManufacturerProductNumber": "TAJB107M006RNJ",
+   "UnitPrice": 0.73,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/kyocera-avx/TAJB107M006RNJ/1126805",
+   "DatasheetUrl": "https://datasheets.kyocera-avx.com/TAJ.pdf",
+   "QuantityAvailable": 85477,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 2049,
+     "ParameterText": "Capacitance",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 µF",
+     "ValueText": "100 µF"
+    },
+    {
+     "ParameterId": 3,
+     "ParameterText": "Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1900",
+     "ValueText": "±20%"
+    },
+    {
+     "ParameterId": 2079,
+     "ParameterText": "Voltage - Rated",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "6.3 V",
+     "ValueText": "6.3 V"
+    },
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "376942",
+     "ValueText": "Molded"
+    },
+    {
+     "ParameterId": 724,
+     "ParameterText": "ESR (Equivalent Series Resistance)",
+     "ParameterType": "String",
+     "ValueId": "59392",
+     "ValueText": "1.7Ohm"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "242918",
+     "ValueText": "-55°C ~ 125°C"
+    },
+    {
+     "ParameterId": 725,
+     "ParameterText": "Lifetime @ Temp.",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "94863",
+     "ValueText": "1411 (3528 Metric), 1210"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "11433",
+     "ValueText": "0.138\" L x 0.110\" W (3.50mm x 2.80mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "8806",
+     "ValueText": "0.083\" (2.10mm)"
+    },
+    {
+     "ParameterId": 508,
+     "ParameterText": "Lead Spacing",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 987,
+     "ParameterText": "Manufacturer Size Code",
+     "ParameterType": "String",
+     "ValueId": "317283",
+     "ValueText": "B"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "350483",
+     "ValueText": "General Purpose"
+    },
+    {
+     "ParameterId": 1531,
+     "ParameterText": "Failure Rate",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 3,
+    "ParentId": 0,
+    "Name": "Capacitors",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/640/398/BCAP0350%20E270%20T11_tmb%2864x64%29.jpg",
+    "SeoDescription": "Capacitor products, also known as \"condensers\", are generally named and organized in reference to the dielectric material incorporated within. Along with variations in construction methods, the choice of dielectric material has strong influence on a given device's relative cost, size, parametric stability, and suitability for a particular application.",
+    "ChildCategories": [
+     {
+      "CategoryId": 59,
+      "ParentId": 3,
+      "Name": "Tantalum Capacitors",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/653/436/T491%20SERIES%203.5L%2C2.8W_tmb%2864x64%29.jpg",
+      "SeoDescription": "A capacitor is a passive electronic device that stores electric charge. Tantalum capacitors have an anode electrode (+) made of tantalum metal, electrolyte that acts as the cathode, and a thin insulating layer of tantalum oxide that acts as the dielectric. Tantalum capacitors have high capacitance-voltage (CV) product per unit volume at low weights and are known for high reliability.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "PN7160A1HN/C100E": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "IC NFC CONTROLLER I2C HVQFN40",
+    "DetailedDescription": "RFID Reader IC 13.56MHz FeliCa, ISO 14443, ISO 15693, MIFARE, NFC I2C 1.65V ~ 1.95V, 3V ~ 3.6V 40-VFQFN Exposed Pad"
+   },
+   "Manufacturer": {
+    "Id": 568,
+    "Name": "NXP USA Inc."
+   },
+   "ManufacturerProductNumber": "PN7160A1HN/C100E",
+   "UnitPrice": 9.09,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/nxp-usa-inc/PN7160A1HN-C100E/15650151",
+   "DatasheetUrl": "http://www.nxp.com/docs/en/data-sheet/PN7160_PN7161.pdf",
+   "QuantityAvailable": 3838,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "396271",
+     "ValueText": "RFID Reader"
+    },
+    {
+     "ParameterId": 139,
+     "ParameterText": "Frequency",
+     "ParameterType": "String",
+     "ValueId": "89038",
+     "ValueText": "13.56MHz"
+    },
+    {
+     "ParameterId": 584,
+     "ParameterText": "Standards",
+     "ParameterType": "String",
+     "ValueId": "346492",
+     "ValueText": "FeliCa, ISO 14443, ISO 15693, MIFARE, NFC"
+    },
+    {
+     "ParameterId": 154,
+     "ParameterText": "Interface",
+     "ParameterType": "String",
+     "ValueId": "356918",
+     "ValueText": "I2C"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "56881",
+     "ValueText": "1.65V ~ 1.95V, 3V ~ 3.6V"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "156459",
+     "ValueText": "-25°C ~ 85°C (TA)"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "215352",
+     "ValueText": "40-VFQFN Exposed Pad"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "214704",
+     "ValueText": "40-HVQFN (6x6)"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 37,
+    "ParentId": 0,
+    "Name": "RF and Wireless",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/442/232/MFG_XR112_Front_tmb.jpg",
+    "SeoDescription": "Radio Frequency and Intermediate Frequency (RF/IF) products are used for wireless transmission of information by means of electromagnetic radiation. Radio Frequency Identification (RFID) is a specific subset of general RF applications, characterized by use of small, inexpensive devices known as \"tags\" capable of containing a limited amount of information, that can be wirelessly retrieved (and in some cases modified) through the use of a specialized device known as a \"reader\" and which are commonly used for object or material tracking, inventory, and similar purposes. Products found within this category may range from finished products for end use, to component-level products and materials from which such finished goods are assembled.",
+    "ChildCategories": [
+     {
+      "CategoryId": 880,
+      "ParentId": 37,
+      "Name": "RFID, RF Access, Monitoring ICs",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/283/576/568%3BSOT618-1%3BHN%3B40_tmb.jpg",
+      "SeoDescription": "RFID or RF access monitoring ICs are semiconductor devices configured as RFID (Radio Frequency Identification) readers, transponders, passive entry or passive start processors and TPMS (Tire Pressure Monitorying System). They are designed to comply with specific RFID standards such as EPC, ISO, NFC, MiFARE and FeliCa, and communicate over I2C, SPI, UART, USB, PWM, RS232, RS422, RS485 and other interfaces.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "LFXTAL085849": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "CRYSTAL 27.12MHZ -40 TO 125C 10P",
+    "DetailedDescription": "27.12 MHz ±10ppm Crystal 10pF 100 Ohms 4-SMD, No Lead"
+   },
+   "Manufacturer": {
+    "Id": 1923,
+    "Name": "IQD Frequency Products"
+   },
+   "ManufacturerProductNumber": "LFXTAL085849",
+   "UnitPrice": 0.64,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/iqd-frequency-products/LFXTAL085849/17372703",
+   "DatasheetUrl": "",
+   "QuantityAvailable": 1442,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "375145",
+     "ValueText": "MHz Crystal"
+    },
+    {
+     "ParameterId": 2150,
+     "ParameterText": "Frequency",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "27.12 MHz",
+     "ValueText": "27.12 MHz"
+    },
+    {
+     "ParameterId": 253,
+     "ParameterText": "Frequency Stability",
+     "ParameterType": "String",
+     "ValueId": "2614",
+     "ValueText": "±50ppm"
+    },
+    {
+     "ParameterId": 537,
+     "ParameterText": "Frequency Tolerance",
+     "ParameterType": "String",
+     "ValueId": "1398",
+     "ValueText": "±10ppm"
+    },
+    {
+     "ParameterId": 35,
+     "ParameterText": "Load Capacitance",
+     "ParameterType": "String",
+     "ValueId": "74213",
+     "ValueText": "10pF"
+    },
+    {
+     "ParameterId": 2082,
+     "ParameterText": "ESR (Equivalent Series Resistance)",
+     "ParameterType": "UnitOfMeasure",
+     "ValueId": "100 Ohms",
+     "ValueText": "100 Ohms"
+    },
+    {
+     "ParameterId": 538,
+     "ParameterText": "Operating Mode",
+     "ParameterType": "String",
+     "ValueId": "349771",
+     "ValueText": "Fundamental"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    },
+    {
+     "ParameterId": 707,
+     "ParameterText": "Ratings",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "228342",
+     "ValueText": "4-SMD, No Lead"
+    },
+    {
+     "ParameterId": 1291,
+     "ParameterText": "Supplier Device Package",
+     "ParameterType": "String",
+     "ValueId": "840189",
+     "ValueText": "4-SMD (2x1.6)"
+    },
+    {
+     "ParameterId": 46,
+     "ParameterText": "Size / Dimension",
+     "ParameterType": "String",
+     "ValueId": "8582",
+     "ValueText": "0.079\" L x 0.063\" W (2.00mm x 1.60mm)"
+    },
+    {
+     "ParameterId": 1500,
+     "ParameterText": "Height - Seated (Max)",
+     "ParameterType": "String",
+     "ValueId": "5212",
+     "ValueText": "0.020\" (0.50mm)"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 12,
+    "ParentId": 0,
+    "Name": "Crystals, Oscillators, Resonators",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/140/638/4-SMD_2.0x1.6_tmb.jpg",
+    "SeoDescription": "Crystal, oscillator, and resonator products are devices used as sources or references for frequency generation and time measurement. Based in most cases on the physical vibration of some mechanical structure that vibrates at a known frequency, they are further classified along lines of their specific implementation and the degree to which additional supporting functions are incorporated, enabling convenience of use or higher attainable degrees of precision and/or accuracy.",
+    "ChildCategories": [
+     {
+      "CategoryId": 171,
+      "ParentId": 12,
+      "Name": "Crystals",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/002/142/959/MFG_4606_C1_tmb%2864x64%29.jpg",
+      "SeoDescription": "Crystal products are passive components most commonly used as time or frequency references in electronic systems. Consisting of a piezoelectric crystal that mechanically vibrates at a known frequency, their use requires provision of an external oscillator circuit with carefully designed capacitance, drive voltage, and series resistance characteristics, to generate a signal at the indicated crystal frequency that operates successfully over the operating temperature range, without damaging the crystal element. Active devices which integrate this additional necessary circuitry are considered oscillators and are catalogued separately.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "BG95M3LA-64-SGNS": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 2,
+  "_product": {
+   "Description": {
+    "ProductDescription": "RF TXRX MOD CELL NAV SMD",
+    "DetailedDescription": "Cellular, Navigation BeiDou, EGDE, Galileo, GLONASS, GPS, GNSS, GSM, LTE Transceiver Module 850MHz, 900MHz, 1.8GHz, 1.9GHz Antenna Not Included Surface Mount"
+   },
+   "Manufacturer": {
+    "Id": 2958,
+    "Name": "Quectel"
+   },
+   "ManufacturerProductNumber": "BG95M3LA-64-SGNS",
+   "UnitPrice": 38.21,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/quectel/BG95M3LA-64-SGNS/13278150",
+   "DatasheetUrl": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7133/Quectel_BG95_Series_LPWA_Specification_V2.2.pdf",
+   "QuantityAvailable": 2760,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 2697,
+     "ParameterText": "DigiKey Programmable",
+     "ParameterType": "String",
+     "ValueId": "750491",
+     "ValueText": "Not Verified"
+    },
+    {
+     "ParameterId": 1883,
+     "ParameterText": "RF Family/Standard",
+     "ParameterType": "String",
+     "ValueId": "328651",
+     "ValueText": "Cellular, Navigation"
+    },
+    {
+     "ParameterId": 578,
+     "ParameterText": "Protocol",
+     "ParameterType": "String",
+     "ValueId": "476746",
+     "ValueText": "BeiDou, EGDE, Galileo, GLONASS, GPS, GNSS, GSM, LTE"
+    },
+    {
+     "ParameterId": 1882,
+     "ParameterText": "Modulation",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 139,
+     "ParameterText": "Frequency",
+     "ParameterType": "String",
+     "ValueId": "290862",
+     "ValueText": "850MHz, 900MHz, 1.8GHz, 1.9GHz"
+    },
+    {
+     "ParameterId": 448,
+     "ParameterText": "Data Rate",
+     "ParameterType": "String",
+     "ValueId": "476747",
+     "ValueText": "1.119Mbps"
+    },
+    {
+     "ParameterId": 306,
+     "ParameterText": "Power - Output",
+     "ParameterType": "String",
+     "ValueId": "146287",
+     "ValueText": "21dBm"
+    },
+    {
+     "ParameterId": 54,
+     "ParameterText": "Sensitivity",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1884,
+     "ParameterText": "Serial Interfaces",
+     "ParameterType": "String",
+     "ValueId": "798176",
+     "ValueText": "GPIO, I2C, PCM, UART, USB"
+    },
+    {
+     "ParameterId": 965,
+     "ParameterText": "Antenna Type",
+     "ParameterType": "String",
+     "ValueId": "314085",
+     "ValueText": "Antenna Not Included"
+    },
+    {
+     "ParameterId": 984,
+     "ParameterText": "Utilized IC / Part",
+     "ParameterType": "String",
+     "ValueId": "818706",
+     "ValueText": "MDM9205-0"
+    },
+    {
+     "ParameterId": 142,
+     "ParameterText": "Memory Size",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 276,
+     "ParameterText": "Voltage - Supply",
+     "ParameterType": "String",
+     "ValueId": "174205",
+     "ValueText": "3.3V ~ 4.3V"
+    },
+    {
+     "ParameterId": 824,
+     "ParameterText": "Current - Receiving",
+     "ParameterType": "String",
+     "ValueId": "56807",
+     "ValueText": "1.65mA"
+    },
+    {
+     "ParameterId": 826,
+     "ParameterText": "Current - Transmitting",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "192642",
+     "ValueText": "-35°C ~ 75°C"
+    },
+    {
+     "ParameterId": 16,
+     "ParameterText": "Package / Case",
+     "ParameterType": "String",
+     "ValueId": "376802",
+     "ValueText": "Module"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 304232,
+    "Name": "BG95"
+   },
+   "Category": {
+    "CategoryId": 37,
+    "ParentId": 0,
+    "Name": "RF and Wireless",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/442/232/MFG_XR112_Front_tmb.jpg",
+    "SeoDescription": "Radio Frequency and Intermediate Frequency (RF/IF) products are used for wireless transmission of information by means of electromagnetic radiation. Radio Frequency Identification (RFID) is a specific subset of general RF applications, characterized by use of small, inexpensive devices known as \"tags\" capable of containing a limited amount of information, that can be wirelessly retrieved (and in some cases modified) through the use of a specialized device known as a \"reader\" and which are commonly used for object or material tracking, inventory, and similar purposes. Products found within this category may range from finished products for end use, to component-level products and materials from which such finished goods are assembled.",
+    "ChildCategories": [
+     {
+      "CategoryId": 872,
+      "ParentId": 37,
+      "Name": "RF Transceiver Modules and Modems",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/503/978/MFG_ESP32-WROOM-32D_tmb.jpg",
+      "SeoDescription": "RF Transceiver Modules are used to send and/or take in a radio frequency signal. The RF family/Standard is Bluetooth, Cellular, General ISM, GPS, Navigation, SiBeam, WiFi, and 802.15.4 with frequency ranging from 70MHz to 65GHz. The data rates range from 600 bps to 12.3Gbps and a power output from -10dBm to 54dBm.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "ATS2D3G NC LFG": {
+  "_http": 200,
+  "_exact": 1,
+  "_productsCount": 1,
+  "_product": {
+   "Description": {
+    "ProductDescription": "SWITCH TACTILE SPST-NC 0.01A 32V",
+    "DetailedDescription": "Tactile Switch SPST-NC Top Actuated Surface Mount"
+   },
+   "Manufacturer": {
+    "Id": 108,
+    "Name": "C&K"
+   },
+   "ManufacturerProductNumber": "ATS2D3G NC LFG",
+   "UnitPrice": 1.0,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/c-k/ATS2D3G-NC-LFG/6965052",
+   "DatasheetUrl": "https://www.littelfuse.com/assetdocs/littelfuse-ck-ats-series-datasheet?assetguid=5f5652c8-c616-492f-b21a-7ce03d2af53e",
+   "QuantityAvailable": 86661,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 130,
+     "ParameterText": "Circuit",
+     "ParameterType": "String",
+     "ValueId": "406589",
+     "ValueText": "SPST-NC"
+    },
+    {
+     "ParameterId": 235,
+     "ParameterText": "Switch Function",
+     "ParameterType": "String",
+     "ValueId": "382041",
+     "ValueText": "On-Mom"
+    },
+    {
+     "ParameterId": 542,
+     "ParameterText": "Contact Rating @ Voltage",
+     "ParameterType": "String",
+     "ValueId": "5090",
+     "ValueText": "0.01A @ 32VDC"
+    },
+    {
+     "ParameterId": 545,
+     "ParameterText": "Actuator Type",
+     "ParameterType": "String",
+     "ValueId": "407938",
+     "ValueText": "Standard"
+    },
+    {
+     "ParameterId": 69,
+     "ParameterText": "Mounting Type",
+     "ParameterType": "String",
+     "ValueId": "409393",
+     "ValueText": "Surface Mount"
+    },
+    {
+     "ParameterId": 1547,
+     "ParameterText": "Actuator Height off PCB, Vertical",
+     "ParameterType": "String",
+     "ValueId": "172296",
+     "ValueText": "3.20mm"
+    },
+    {
+     "ParameterId": 2014,
+     "ParameterText": "Actuator Length, Right Angle",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1548,
+     "ParameterText": "Actuator Orientation",
+     "ParameterType": "String",
+     "ValueId": "413829",
+     "ValueText": "Top Actuated"
+    },
+    {
+     "ParameterId": 258,
+     "ParameterText": "Termination Style",
+     "ParameterType": "String",
+     "ValueId": "352076",
+     "ValueText": "Gull Wing"
+    },
+    {
+     "ParameterId": 567,
+     "ParameterText": "Outline",
+     "ParameterType": "String",
+     "ValueId": "250574",
+     "ValueText": "6.00mm x 3.80mm"
+    },
+    {
+     "ParameterId": 528,
+     "ParameterText": "Illumination",
+     "ParameterType": "String",
+     "ValueId": "380363",
+     "ValueText": "Non-Illuminated"
+    },
+    {
+     "ParameterId": 522,
+     "ParameterText": "Illumination Type, Color",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 524,
+     "ParameterText": "Illumination Voltage (Nominal)",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 550,
+     "ParameterText": "Operating Force",
+     "ParameterType": "String",
+     "ValueId": "141404",
+     "ValueText": "204gf"
+    },
+    {
+     "ParameterId": 697,
+     "ParameterText": "Ingress Protection",
+     "ParameterType": "String",
+     "ValueId": "359916",
+     "ValueText": "IP54 - Dust Protected, Water Resistant"
+    },
+    {
+     "ParameterId": 5,
+     "ParameterText": "Features",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 252,
+     "ParameterText": "Operating Temperature",
+     "ParameterType": "String",
+     "ValueId": "212478",
+     "ValueText": "-40°C ~ 125°C"
+    }
+   ],
+   "BaseProductNumber": {
+    "Id": 483174,
+    "Name": "ATS2D"
+   },
+   "Category": {
+    "CategoryId": 15,
+    "ParentId": 0,
+    "Name": "Switches",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+    "SeoDescription": "Switches are devices used to interrupt the flow of electrical current in one or more circuits, under the direct physical control of some outside mechanism such as a user's finger or thumb, a magnet, or a moving machine component. Organization of sub-groups within the category occurs along lines of the physical style or form of switches' actuators, or a particular application or purpose for which they are designed.",
+    "ChildCategories": [
+     {
+      "CategoryId": 197,
+      "ParentId": 15,
+      "Name": "Tactile Switches",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/274/017/MFG_TL3215_tmb.jpg",
+      "SeoDescription": "Tactile Switches are an electromechanical device used to start or stop current flow along a circuit. Devices in this family are often very small and are turned on or off through the use of an actuator that is depressed into the unit’s body. These devices also provide feedback to the user through an audible click and/or a change in pressure upon reaching the trigger point. The operating force ranges from 50gf to 970gf.",
+      "ChildCategories": []
+     }
+    ]
+   }
+  }
+ },
+ "RC0402JR-7D0RL": {
+  "_http": 200,
+  "_productsCount": null,
+  "_product": null
+ },
+ "RV-3028-C7": {
+  "_http": 200,
+  "_exact": 0,
+  "_productsCount": 4,
+  "_product": {
+   "Description": {
+    "ProductDescription": "EVAL BOARD FOR RV-3028-C7",
+    "DetailedDescription": "RV-3028-C7 RV-3028 Real Time Clock (RTC) Timing Evaluation Board"
+   },
+   "Manufacturer": {
+    "Id": 2195,
+    "Name": "Micro Crystal AG"
+   },
+   "ManufacturerProductNumber": "RV-3028-C7-EVALUATION-BOARD",
+   "UnitPrice": 17.47,
+   "ProductUrl": "https://www.digikey.com/en/products/detail/micro-crystal-ag/RV-3028-C7-EVALUATION-BOARD/10431075",
+   "DatasheetUrl": "https://www.microcrystal.com/fileadmin/Media/Products/RTC/Demoboard/RV-3028-C7_Demo-Board.pdf",
+   "QuantityAvailable": 44,
+   "ProductStatus": {
+    "Id": 0,
+    "Status": "Active"
+   },
+   "Discontinued": false,
+   "EndOfLife": false,
+   "Parameters": [
+    {
+     "ParameterId": 183,
+     "ParameterText": "Type",
+     "ParameterType": "String",
+     "ValueId": "412196",
+     "ValueText": "Timing"
+    },
+    {
+     "ParameterId": 110,
+     "ParameterText": "Function",
+     "ParameterType": "String",
+     "ValueId": "392880",
+     "ValueText": "Real Time Clock (RTC)"
+    },
+    {
+     "ParameterId": 1023,
+     "ParameterText": "Embedded",
+     "ParameterType": "String",
+     "ValueId": "380240",
+     "ValueText": "No"
+    },
+    {
+     "ParameterId": 984,
+     "ParameterText": "Utilized IC / Part",
+     "ParameterType": "String",
+     "ValueId": "399378",
+     "ValueText": "RV-3028-C7"
+    },
+    {
+     "ParameterId": 1018,
+     "ParameterText": "Primary Attributes",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 1019,
+     "ParameterText": "Secondary Attributes",
+     "ParameterType": "String",
+     "ValueId": "1",
+     "ValueText": "-"
+    },
+    {
+     "ParameterId": 224,
+     "ParameterText": "Contents",
+     "ParameterType": "String",
+     "ValueId": "321631",
+     "ValueText": "Board(s)"
+    }
+   ],
+   "BaseProductNumber": {},
+   "Category": {
+    "CategoryId": 33,
+    "ParentId": 0,
+    "Name": "Development Boards, Kits, Programmers",
+    "ProductCount": 0,
+    "NewProductCount": 0,
+    "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/200/310/411/MFG_ATATMEL-ICE_tmb.jpg",
+    "SeoDescription": "Development board, kit, and programmer products include tools and assemblies used for product development and evaluation purposes. Evaluation boards are produced by a manufacturer to allow prospective users a convenient way to characterize device behavior in context of a known-good implementation, whereas development boards and kits typically include additional features or accessories intended to aid a user in developing their own product based on some device. Programmers and related products are used for configuring products having a behavior that is user-adjustable or user-specified, such as a programmable oscillator or microcontroller.",
+    "ChildCategories": [
+     {
+      "CategoryId": 2041,
+      "ParentId": 33,
+      "Name": "Evaluation Boards",
+      "ProductCount": 0,
+      "NewProductCount": 0,
+      "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/282/325/MFG_EVAL-ADE9000EBZ_tmb.jpg",
+      "SeoDescription": "Evaluation boards are produced by a manufacturer to allow prospective users a convenient way to characterize device behavior in context of a known-good implementation. Types of evaluation boards include analog to digital converters (ADCs), audio amplifiers, digital to analog converters (DACs), complex logic (FPGA, CPLD), MCU, DSP, expansion boards, daughter cards, LED drivers, linear voltage regulators, op amps, sensors, RF, RFID, DC/DC & AC/DC (Off-Line) SMPS, and more.",
+      "ChildCategories": [
+       {
+        "CategoryId": 787,
+        "ParentId": 2041,
+        "Name": "Evaluation and Demonstration Boards and Kits",
+        "ProductCount": 0,
+        "NewProductCount": 0,
+        "ImageUrl": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/3/300/373/134/DLPDLCR2000EVM_tmb.jpg",
+        "SeoDescription": "Products within this family provide a convenient means of evaluating the performance or behavior of some focus device, in the context of a proven implementation that is generally well-documented and supported by evaluation software, as appropriate. Typically consisting of a printed circuit board on which the focus device has been populated along with necessary or helpful support components, additional components such as cabling or power supplies may also be included. Evaluation platforms for device classes that are particularly numerous or distinctive in their classification such as ADCs, DACs, and switch-mode power supplies may be grouped together as a separate product family.",
+        "ChildCategories": []
+       }
+      ]
+     }
+    ]
+   }
+  }
+ }
+}

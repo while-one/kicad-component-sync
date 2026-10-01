@@ -51,6 +51,33 @@ class TestDeriveValue:
         """Each family renders in the project's single SI convention."""
         assert derive_value(parameters) == expected
 
+    @pytest.mark.parametrize("micro", ["\u00b5", "\u03bc", "u"])
+    def test_micro_prefix_spelling(self, micro: str) -> None:
+        """All three spellings of micro are accepted, because vendors differ.
+
+        DigiKey sends the micro sign U+00B5. Recognising only the ASCII ``u``
+        made ``0.1 µF`` read as 0.1 farads, which rendered as the plausible
+        ``100 mF`` instead of ``100 nF`` -- wrong by a factor of a million, with
+        no error raised.
+        """
+        assert derive_value({"Capacitance": f"0.1 {micro}F"}) == "100 nF"
+        assert derive_value({"Inductance": f"4.7 {micro}H"}) == "4.7 uH"
+        assert derive_value({"Capacitance": f"100 {micro}F"}) == "100 uF"
+
+    def test_output_never_contains_exotic_characters(self) -> None:
+        """Input may be micro sign; output stays plain ASCII.
+
+        Symbol libraries are hand-maintained plain text, and a stray U+00B5 is
+        easy to mangle when typing a new value by hand.
+        """
+        for parameters in (
+            {"Capacitance": "0.1 \u00b5F"},
+            {"Inductance": "4.7 \u03bcH"},
+            {"Resistance": "10 kOhms"},
+        ):
+            rendered = derive_value(parameters)
+            assert rendered.isascii(), rendered
+
     def test_case_is_significant_in_units(self) -> None:
         """Unit case is preserved: MOhm is mega-ohm, mOhm is milli-ohm."""
         assert derive_value({"Resistance": "1 MOhm"}) == "1 MOhm"

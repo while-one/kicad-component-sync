@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -28,13 +29,56 @@ __all__ = ["DigiKeyProvider"]
 
 LOGGER = logging.getLogger(__name__)
 
+#: Characters treated as separators when comparing vendor parameter names.
+_SEPARATORS = re.compile(r"[\s/_-]+")
+
 TOKEN_URL = "https://api.digikey.com/v1/oauth2/token"
-PRODUCT_URL = "https://api.digikey.com/products/v4/search/{keyword}"
+#: Product search endpoint.
+#:
+#: This is a POST with a JSON body, not a GET carrying the part number in the
+#: path. The ``/products/v4/search/keyword`` shape was confirmed against the
+#: published OpenAPI document; the earlier guess of
+#: ``/products/v4/search/{keyword}`` answers 404 for every request, which made
+#: every single part look like a miss.
+PRODUCT_URL = "https://api.digikey.com/products/v4/search/keyword"
 DEFAULT_TIMEOUT = 30.0
 
 #: Parameter names normalised onto dedicated :class:`ComponentData` attributes.
 _TEMP_KEYS = ("operating_temperature", "temperature_range", "operating_temp")
-_VOLTAGE_KEYS = ("voltage_rating", "voltage", "supply_voltage")
+_VOLTAGE_KEYS = ("voltage_supply", "voltage_rated", "voltage_rating", "supply_voltage")
+
+#: Parameters consulted for the package designation, in priority order.
+#:
+#: Package is not a top-level field in this API. ``Package / Case`` is the
+#: distributor's own wording and is preferred; ``Supplier Device Package`` is
+#: the JEDEC-style designation some manufacturers use instead.
+_PACKAGE_KEYS = ("package_case", "supplier_device_package", "package")
+
+#: Categories whose ``Value`` is a quantity rather than a part number.
+#:
+#: Deriving a Value is only safe for discrete passives, where the label really is
+#: the component's defining characteristic. Integrated circuits, modules,
+#: switches and development boards conventionally carry their part number as
+#: the Value, and overwriting it would destroy them.
+#:
+#: The NFC reader ``PN7160A1HN/C100E`` is the case that matters: it publishes
+#: ``Frequency = 13.56MHz``, so a parameter-only rule would replace its part
+#: number with "13.56 MHz". The category is the distributor's own taxonomy, so
+#: this is vendor data rather than a hand-maintained list.
+_PASSIVE_CATEGORIES = frozenset(
+    {
+        "capacitors",
+        "resistors",
+        "inductors, coils, chokes",
+        "crystals, oscillators, resonators",
+    }
+)
+
+#: How many candidates to request per search.
+#:
+#: A part number occasionally returns several products that differ only by
+#: packaging, so more than one is needed for the exact-match selection below.
+_SEARCH_LIMIT = 10
 
 
 class DigiKeyProvider(BaseProvider):
@@ -147,19 +191,28 @@ class DigiKeyProvider(BaseProvider):
         self.authenticate()
         assert self._token is not None  # narrowed by authenticate()
 
-        url = PRODUCT_URL.format(keyword=mpn)
-        headers = {"Authorization": f"Bearer {self._token}", "X-DIGIKEY-Client-Id": self.client_id}
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "X-DIGIKEY-Client-Id": self.client_id,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        body = {"Keywords": mpn, "Limit": _SEARCH_LIMIT, "Offset": 0}
 
         try:
-            response = self._session.get(url, headers=headers, timeout=self.timeout)
+            response = self._session.post(
+                PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
+            )
         except requests.RequestException as exc:
             raise ProviderAPIError(f"DigiKey search failed for {mpn!r}: {exc}") from exc
 
         if response.status_code == 404:
             raise PartNotFoundError(mpn)
         if response.status_code != 200:
+            detail = response.text[:200].replace("\n", " ")
             raise ProviderAPIError(
-                f"DigiKey search for {mpn!r} failed with HTTP {response.status_code}"
+                f"DigiKey search for {mpn!r} failed with HTTP "
+                f"{response.status_code}: {detail}"
             )
 
         try:
@@ -214,9 +267,12 @@ class DigiKeyProvider(BaseProvider):
         """
         parameters: dict[str, str] = {}
         for entry in product.get("Parameters", []) or []:
-            name = str(entry.get("Parameter", "")).strip()
-            value = str(entry.get("Value", "")).strip()
-            if name and value:
+            # The API names these ParameterText/ValueText. Reading "Parameter"
+            # and "Value" returns nothing at all, which left every part with an
+            # empty parameter set and therefore no Value and no ranges.
+            name = str(entry.get("ParameterText", "")).strip()
+            value = str(entry.get("ValueText", "")).strip()
+            if name and not _is_placeholder(value):
                 parameters[name] = value
 
         manufacturer = product.get("Manufacturer", {}) or {}
@@ -225,19 +281,39 @@ class DigiKeyProvider(BaseProvider):
         return ComponentData(
             mpn=mpn,
             manufacturer=str(manufacturer.get("Name", "")).strip(),
-            description=str(product.get("Description", "")).strip(),
-            datasheet=str(product.get("Datasheet", "")).strip(),
-            value=derive_value(parameters),
+            description=description_of(product),
+            datasheet=datasheet_of(product),
+            value=derive_value(parameters) if is_discrete_passive(product) else "",
             voltage_min=voltage[0],
             voltage_max=voltage[1],
             voltage_text=voltage[2],
             temp_min=temperature[0],
             temp_max=temperature[1],
             temp_text=temperature[2],
-            package=str((product.get("Package") or {}).get("Name", "")).strip(),
+            package=_first_match(parameters, _PACKAGE_KEYS),
             digikey_url=product_url(product),
             raw_parameters=parameters,
         )
+
+
+def is_discrete_passive(product: dict[str, Any]) -> bool:
+    """Return whether a product's ``Value`` should be derived from parameters.
+
+    Only the discrete passive families qualify. Everything else, including
+    modules and integrated circuits, conventionally carries its part number as
+    the Value, and deriving one would destroy it.
+
+    Args:
+        product: The matched product record.
+
+    Returns:
+        True when the product is a capacitor, resistor, inductor or crystal.
+    """
+    category = product.get("Category")
+    if not isinstance(category, dict):
+        return False
+    name = str(category.get("Name", "")).strip().casefold()
+    return name in _PASSIVE_CATEGORIES
 
 
 def product_url(product: dict[str, Any]) -> str:
@@ -256,6 +332,71 @@ def product_url(product: dict[str, Any]) -> str:
     return str(product.get("ProductUrl", "")).strip()
 
 
+def description_of(product: dict[str, Any]) -> str:
+    """Return the human readable description.
+
+    ``Description`` in this API is an object, not a string. ``DetailedDescription``
+    is preferred because it is the full prose form, for example
+    ``"10 kOhms ±1% 0.063W Chip Resistor 0402 (1005 Metric)"``; the short
+    ``ProductDescription`` is the fallback, and some entries carry neither.
+
+    Args:
+        product: The matched product record.
+
+    Returns:
+        The description, or ``""`` when the record carried none.
+    """
+    description = product.get("Description")
+    if isinstance(description, str):
+        return description.strip()
+    if isinstance(description, dict):
+        for key in ("DetailedDescription", "ProductDescription"):
+            value = description.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+
+
+def datasheet_of(product: dict[str, Any]) -> str:
+    """Return the datasheet URL.
+
+    The field is named ``DatasheetUrl``, and DigiKey frequently returns a
+    protocol-relative value such as ``//mm.digikey.com/...``. KiCad stores this
+    string verbatim, so an unqualified ``//host/...`` would not resolve when
+    clicked; the scheme is restored in that case and only then.
+
+    Args:
+        product: The matched product record.
+
+    Returns:
+        An absolute datasheet URL, or ``""`` when the record carried none.
+    """
+    url = str(product.get("DatasheetUrl", "")).strip()
+    if url.startswith("//"):
+        return f"https:{url}"
+    return url
+
+
+#: Values DigiKey uses to mean "this parameter is not applicable".
+#:
+#: The API fills inapplicable parameters with a bare hyphen rather than omitting
+#: them. Writing that through would put a meaningless ``Operating Temperature =
+#: "-"`` into the symbol library, so it is treated as absent.
+_PLACEHOLDER_VALUES = frozenset({"-", "--", "n/a", "na", "none", "not applicable", ""})
+
+
+def _is_placeholder(text: str) -> bool:
+    """Return whether a vendor value carries no information.
+
+    Args:
+        text: A raw parameter value as the vendor wrote it.
+
+    Returns:
+        True when the value is one of the API's "not applicable" markers.
+    """
+    return text.strip().casefold() in _PLACEHOLDER_VALUES
+
+
 def _build_bounds(
     text: str,
 ) -> tuple[str, str, str]:
@@ -271,7 +412,7 @@ def _build_bounds(
     Returns:
         A ``(min, max, text)`` triple; empty strings where nothing was derived.
     """
-    if not text.strip():
+    if _is_placeholder(text):
         return ("", "", "")
     bounds = parse_range(text)
     if bounds is None or not bounds.has_bounds:
@@ -285,11 +426,15 @@ def _build_bounds(
 
 
 def _first_match(parameters: dict[str, str], keys: tuple[str, ...]) -> str:
-    """Return the first non-empty value whose key matches, ignoring case and spacing.
+    """Return the first non-empty value whose key matches, ignoring punctuation.
 
-    DigiKey spells parameter names with spaces (``"Voltage Rating"``) while
-    other catalogues use underscores, so both sides are normalised before
-    comparison.
+    DigiKey parameter names are inconsistent: ``"Voltage - Rated"``,
+    ``"Voltage - Supply"`` and ``"Package / Case"`` all mix spaces, hyphens and
+    slashes. Replacing each character individually produced ``"voltage___supply"``
+    and ``"package_/_case"``, which matched nothing and left every part with an
+    empty package and no voltage. Runs of separator characters are therefore
+    collapsed to a single underscore, so all of those normalise to
+    ``voltage_supply`` and ``package_case``.
 
     Args:
         parameters: Vendor parameter mapping.
@@ -298,13 +443,22 @@ def _first_match(parameters: dict[str, str], keys: tuple[str, ...]) -> str:
     Returns:
         The matching value, or ``""`` when nothing matches.
     """
-
-    def normalise(text: str) -> str:
-        return text.strip().casefold().replace(" ", "_").replace("-", "_")
-
-    lookup = {normalise(key): value for key, value in parameters.items()}
+    lookup = {_normalise_key(key): value for key, value in parameters.items()}
     for key in keys:
-        value = lookup.get(normalise(key), "").strip()
+        value = lookup.get(_normalise_key(key), "").strip()
         if value:
             return value
     return ""
+
+
+def _normalise_key(text: str) -> str:
+    """Return a canonical form of a vendor parameter name for comparison.
+
+    Args:
+        text: A parameter name as the vendor wrote it.
+
+    Returns:
+        The name lowercased with every run of spaces, hyphens, slashes and
+        underscores collapsed to a single underscore.
+    """
+    return _SEPARATORS.sub("_", text.strip().casefold()).strip("_")
