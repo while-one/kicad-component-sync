@@ -11,6 +11,8 @@ from ..cache import LookupCache
 from ..exceptions import FileFormatError  # noqa: F401  (re-exported for subclasses)
 from ..models import ChangeAction, ComponentData, ProcessResult, PropertyChange
 from ..providers.base import BaseProvider
+from ..reporting import Palette, default_palette, render_report
+from ..selection import FieldSelection
 
 __all__ = ["BaseProcessor", "atomic_write"]
 
@@ -70,18 +72,60 @@ class BaseProcessor(ABC):
         provider: Provider used to resolve part numbers.
         dry_run: When true, nothing is ever written to disk.
         cache: Memoises provider lookups for the lifetime of this processor.
+        fields: Restricts which fields this run may change.
+        colour: When false the report is plain text regardless of destination.
+        width: Maximum width for each value rendered in the report.
     """
 
-    def __init__(self, provider: BaseProvider, dry_run: bool = False) -> None:
+    def __init__(
+        self,
+        provider: BaseProvider,
+        dry_run: bool = False,
+        fields: FieldSelection | None = None,
+        colour: bool | None = None,
+        width: int = 60,
+    ) -> None:
         """Initialise the processor.
 
         Args:
             provider: Provider used to resolve part numbers.
             dry_run: When true, no file on disk is modified.
+            fields: Restricts which fields may change; unrestricted by default.
+            colour: Force colour on or off, or ``None`` to detect from the
+                destination stream.
+            width: Maximum width for each value rendered in the report.
         """
         self.provider = provider
         self.dry_run = dry_run
         self.cache = LookupCache()
+        self.fields = fields if fields is not None else FieldSelection()
+        self._colour = colour
+        self.width = width
+
+    def palette(self) -> Palette:
+        """Return the colour helper this processor should report with.
+
+        Returns:
+            A palette honouring the instance setting and the ``NO_COLOR``
+            convention.
+        """
+        return default_palette(force=self._colour)
+
+    def _report(self, result: ProcessResult) -> None:
+        """Print the grouped review report.
+
+        Args:
+            result: The result being reported.
+        """
+        print(
+            render_report(
+                result,
+                palette=self.palette(),
+                selection=self.fields,
+                width=self.width,
+            ),
+            end="",
+        )
 
     @abstractmethod
     def process(self, file_path: Path, dry_run: bool = False) -> ProcessResult:
@@ -115,13 +159,17 @@ class BaseProcessor(ABC):
         """
         return self.cache.fetch(self.provider, mpn)
 
-    @staticmethod
     def _classify(
+        self,
         identifier: str,
         existing: dict[str, str],
         desired: dict[str, str],
     ) -> list[PropertyChange]:
         """Compare desired fields against current ones.
+
+        The active :class:`~component_sync.selection.FieldSelection` is applied
+        here, before any edit is planned, so a filtered field is never written
+        even transiently.
 
         Args:
             identifier: MPN for CSV rows, or symbol name for KiCad symbols.
@@ -134,6 +182,12 @@ class BaseProcessor(ABC):
         """
         changes: list[PropertyChange] = []
         for name, value in desired.items():
+            if not self.fields.admits(name):
+                self.fields.note_suppressed(name)
+                continue
+            if self.fields.is_cosmetic(existing.get(name), value):
+                self.fields.note_suppressed(name)
+                continue
             if name not in existing:
                 changes.append(PropertyChange(identifier, name, None, value, ChangeAction.ADD))
             elif existing[name] != value:

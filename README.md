@@ -51,6 +51,46 @@ Exit status is `0` on success, `1` on an expected failure, `130` on interrupt.
 A run that could not resolve some parts exits non-zero in write mode so it can
 gate a CI job.
 
+### Reviewing a large library
+
+A run over a real library reports a few hundred changes spanning very different
+levels of risk, so the report leads with counts and then groups by how much
+attention each change deserves:
+
+| Group | Meaning |
+| --- | --- |
+| `NEEDS REVIEW` | overwrites a value that already exists — someone chose that text |
+| `VALUE CONVENTION` | the deliberate `Value` standardisation, called out on its own |
+| `SAFE ADDS` | fills an empty field; nothing is lost if the value is wrong |
+| `UNRESOLVED` | parts that did not resolve, which need an action of their own |
+
+Field selection keeps a review focused. Filters are applied **before** any edit
+is planned, so a filtered field is never written even transiently:
+
+```bash
+# Just the SI convention: 264 changes become 9
+python -m component_sync.cli -n --only Value lib.kicad_sym
+
+# Keep descriptions, skip the noisy rewrite of your own prose
+python -m component_sync.cli -n --skip Description lib.kicad_sym
+
+# 'Yageo' -> 'YAGEO' is a real edit but never a useful review decision
+python -m component_sync.cli -n --ignore-case lib.kicad_sym
+```
+
+`--only` takes precedence over `--skip`. A run that filtered something out says
+so in its footer rather than silently reporting less:
+
+```
+  filters     only: manufacturer  ignore-case
+  held back   Datasheet, Description, Digikey, Package, Value  (excluded by the filters above)
+```
+
+Colour is used only when writing to a terminal, so redirecting to a file yields
+plain text. `NO_COLOR` is honoured and `--no-color` forces it off. `--width N`
+sets the maximum width of a rendered value, since some datasheet URLs run past
+250 characters.
+
 ## The KiCad workflow
 
 **KiCad 10 exposes no Python API for the Schematic or Symbol editor.** There is a
@@ -271,7 +311,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 181 tests
+python -m pytest -q                     # 216 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

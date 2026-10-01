@@ -73,16 +73,16 @@ class TestCSVProcessor:
     def test_dry_run_prints_report(
         self, tmp_path: Path, csv_bom_text: str, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """A dry run narrates its proposed changes."""
+        """A dry run narrates its proposed changes, grouped by risk."""
         path = tmp_path / "bom.csv"
         path.write_text(csv_bom_text, encoding="utf-8")
 
         CSVProcessor(provider_with(**{CAP.mpn: CAP}), dry_run=True).process(path)
 
         out = capsys.readouterr().out
-        assert "Dry run" in out
-        assert "Proposed changes" in out
+        assert "DRY RUN" in out
         assert "GRM155R61C104KA88D" in out
+        assert "SUMMARY" in out
 
     def test_write_adds_new_columns(
         self, tmp_path: Path, csv_bom_text: str
@@ -247,13 +247,16 @@ class TestKiCadSymProcessor:
     def test_dry_run_prints_report(
         self, tmp_path: Path, kicad_sym_text: str, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """A dry run narrates its proposed changes."""
+        """A dry run narrates its proposed changes, grouped by risk."""
         path = tmp_path / "lib.kicad_sym"
         path.write_text(kicad_sym_text, encoding="utf-8")
 
         KiCadSymProcessor(provider_with(**{CAP.mpn: CAP}), dry_run=True).process(path)
 
-        assert "Dry run" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "DRY RUN" in out
+        assert "NEEDS REVIEW" in out or "SAFE ADDS" in out
+        assert "SUMMARY" in out
 
     def test_existing_property_value_replaced(
         self, tmp_path: Path, kicad_sym_text: str

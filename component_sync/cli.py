@@ -19,6 +19,7 @@ from .processors.csv_processor import CSVProcessor
 from .processors.kicad_processor import KiCadSymProcessor
 from .providers.base import BaseProvider
 from .providers.factory import ProviderFactory
+from .selection import FieldSelection
 
 __all__ = ["main", "build_parser", "select_processor"]
 
@@ -95,6 +96,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the DIGIKEY_CLIENT_SECRET environment variable.",
     )
     parser.add_argument(
+        "--only",
+        default=None,
+        metavar="FIELDS",
+        help=(
+            "Comma separated fields the run may change, e.g. --only Value,Package. "
+            "Everything else is left alone."
+        ),
+    )
+    parser.add_argument(
+        "--skip",
+        default=None,
+        metavar="FIELDS",
+        help=(
+            "Comma separated fields to leave alone, e.g. --skip Description. "
+            "Ignored when --only is given."
+        ),
+    )
+    parser.add_argument(
+        "--ignore-case",
+        action="store_true",
+        help=(
+            "Treat a change that differs only in letter case as no change, so "
+            "'Yageo' -> 'YAGEO' is not proposed."
+        ),
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable colour even when writing to a terminal.",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=60,
+        metavar="N",
+        help="Maximum width of each value in the report (default: 60).",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -143,8 +182,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         provider = _build_provider(args)
         processor_class = select_processor(input_file)
+        selection = FieldSelection.build(
+            only=args.only,
+            skip=args.skip,
+            ignore_case=args.ignore_case,
+        )
         with provider:
-            processor = processor_class(provider, dry_run=args.dry_run)
+            processor = processor_class(
+                provider,
+                dry_run=args.dry_run,
+                fields=selection,
+                colour=False if args.no_color else None,
+                width=args.width,
+            )
             result = processor.process(input_file)
     except ComponentSyncError as exc:
         print(f"error: {exc}", file=sys.stderr)

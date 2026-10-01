@@ -190,19 +190,3 @@ class CSVProcessor(BaseProcessor):
                 row[index] = value
         return new_header, rows
 
-    @staticmethod
-    def _report(result: ProcessResult) -> None:
-        """Print the proposed changes for a dry run.
-
-        Args:
-            result: The result being reported.
-        """
-        print("Dry run: no files were modified.")
-        print("Proposed changes:")
-        if result.changes:
-            for change in result.changes:
-                print(change.describe())
-        else:
-            print("  (none - BOM is already up to date)")
-        print()
-        print(result.summary())
