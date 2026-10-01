@@ -136,6 +136,7 @@ class KiCadSymProcessor(BaseProcessor):
             missing_parts=tuple(missing),
             dry_run=dry,
             written=bool(edits),
+            lookups=self.cache.stats.describe(),
         )
         if dry:
             self._report(result)

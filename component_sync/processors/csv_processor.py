@@ -119,6 +119,7 @@ class CSVProcessor(BaseProcessor):
             missing_parts=tuple(missing),
             dry_run=dry,
             written=bool(changes) and not dry,
+            lookups=self.cache.stats.describe(),
         )
         if dry:
             self._report(result)

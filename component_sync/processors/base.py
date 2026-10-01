@@ -7,6 +7,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from ..cache import LookupCache
 from ..exceptions import FileFormatError  # noqa: F401  (re-exported for subclasses)
 from ..models import ChangeAction, ComponentData, ProcessResult, PropertyChange
 from ..providers.base import BaseProvider
@@ -60,9 +61,15 @@ class BaseProcessor(ABC):
     number through the active provider, and writes normalised fields back.
     Subclasses decide how to locate components and how to mutate the file.
 
+    Every instance owns one :class:`~component_sync.cache.LookupCache`, shared by
+    all of its calls to :meth:`process`. A bill of materials names the same part
+    many times over, so without the cache a run would issue one request per
+    component instance rather than one per distinct part.
+
     Attributes:
         provider: Provider used to resolve part numbers.
         dry_run: When true, nothing is ever written to disk.
+        cache: Memoises provider lookups for the lifetime of this processor.
     """
 
     def __init__(self, provider: BaseProvider, dry_run: bool = False) -> None:
@@ -74,6 +81,7 @@ class BaseProcessor(ABC):
         """
         self.provider = provider
         self.dry_run = dry_run
+        self.cache = LookupCache()
 
     @abstractmethod
     def process(self, file_path: Path, dry_run: bool = False) -> ProcessResult:
@@ -92,7 +100,12 @@ class BaseProcessor(ABC):
     # Shared helpers for subclasses
     # ------------------------------------------------------------------
     def _resolve(self, mpn: str) -> ComponentData | None:
-        """Resolve one MPN, returning ``None`` and logging when it is missing.
+        """Resolve one MPN through the cache, returning ``None`` when missing.
+
+        A part number that is not stocked is reported to the caller, which lists
+        it so the author can check it, rather than being raised: an unresolvable
+        MPN is data the author needs to see, not a crash. Every other provider
+        failure propagates, because that is a genuine fault worth stopping for.
 
         Args:
             mpn: Manufacturer part number to resolve.
@@ -100,12 +113,7 @@ class BaseProcessor(ABC):
         Returns:
             Component data, or ``None`` when the provider has no match.
         """
-        try:
-            return self.provider.fetch_component_data(mpn)
-        except Exception as exc:  # noqa: BLE001 - surfaced to the caller as a report
-            if type(exc).__name__ == "PartNotFoundError":
-                return None
-            raise
+        return self.cache.fetch(self.provider, mpn)
 
     @staticmethod
     def _classify(

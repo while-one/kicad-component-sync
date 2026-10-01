@@ -208,6 +208,8 @@ class ProcessResult:
         missing_parts: MPNs the provider could not resolve.
         dry_run: Whether the run was non-destructive.
         written: Whether the file was actually replaced on disk.
+        lookups: How many provider lookups were served from cache rather than
+            requested, or ``None`` when the processor reported no statistics.
     """
 
     file_path: str
@@ -215,6 +217,7 @@ class ProcessResult:
     missing_parts: tuple[str, ...] = ()
     dry_run: bool = False
     written: bool = False
+    lookups: str | None = None
 
     @property
     def modified_count(self) -> int:
@@ -236,6 +239,8 @@ class ProcessResult:
             f"Missing     : {len(self.missing_parts)}",
             f"Written     : {'yes' if self.written else 'no'}",
         ]
+        if self.lookups:
+            lines.append(f"Cache       : {self.lookups}")
         if self.missing_parts:
             lines.append("")
             lines.append("Parts not found:")

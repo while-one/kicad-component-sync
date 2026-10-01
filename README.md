@@ -113,6 +113,30 @@ ones appended.
   recursive-descent parser; structure is never interpreted by regular
   expression.
 
+## Caching
+
+A bill of materials names the same part many times over. In this project 172
+component instances resolve to only 56 distinct part numbers, so every processor
+owns a `LookupCache` and one request is made per distinct part, not per row:
+
+```
+Cache       : cache: 116 reused, 56 requested (+102 value hits, +14 miss hits, 0 failed)
+```
+
+The rules are deliberately conservative:
+
+- **Misses are cached too.** An unstocked part repeats just as much as a stocked
+  one, and re-querying it costs the same request.
+- **Keyed on provider *identity*, not its name.** Two instances of the same class
+  pointed at different distributor accounts would legitimately return different
+  data, so they never share entries.
+- **Only outer whitespace and case are normalised.** `PCA85162T/Q900/1Y` and
+  `ATS2D3G NC LFG` keep their internal separators; stripping them would invent a
+  part number that does not exist.
+- **Transient faults are never cached.** A transport or server error is retried
+  on the next occurrence. Caching it would permanently drop a part that is in
+  fact available, and its symbol would silently never gain its fields.
+
 ## Managed fields
 
 Field names follow the project's existing convention: ranges are written as
@@ -198,19 +222,19 @@ the CLI automatically.
 
 ## Known limitations
 
-- **No response caching.** Every row mentioning a part triggers its own request.
-  Fine for a grouped BOM (56 unique parts of 57 rows), but a *per-instance* BOM
-  would issue 166 calls for 56 distinct parts and hit distributor rate limits.
+- **The cache is per-run, not on disk.** Starting a second run re-requests
+  everything. Persisting responses across runs would go stale, and a stale price
+  or stock figure is worse than a slow run.
 - **MPNs must be exact.** Some libraries store `Part` values that are not clean
-  orderable part numbers, for example `PCA85162T/Q900/1Y` (packaging suffix),
-  `PN7160A1HN/C100E` (needs an underscore), or
-  `RV-3028-C7 32.768kHz 1ppm TA QA` (MPN plus description). These miss, and are
-  reported under *Parts not found*.
+  orderable part numbers, for example `RV-3028-C7 32.768kHz 1ppm TA QA` (MPN
+  plus description). These miss, and are reported under *Parts not found*, which
+  is where the author discovers them. The tool deliberately does not guess: every
+  normalisation that would "fix" this one breaks a real part elsewhere.
 
 ## Development
 
 ```bash
-python -m pytest -q                     # 105 tests
+python -m pytest -q                     # 165 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```
