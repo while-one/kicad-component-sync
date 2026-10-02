@@ -17,7 +17,82 @@ from dataclasses import dataclass
 
 from .models import PropertyChange
 
-__all__ = ["FieldSelection", "split_field_list"]
+__all__ = ["FieldSelection", "ComponentFilter", "split_field_list"]
+
+
+@dataclass(frozen=True)
+class ComponentFilter:
+    """Restricts a run to the components whose name or part number matches.
+
+    Selecting a single component is a normal thing to want when a library holds
+    fifty-eight symbols, and it is worth more than a convenience here: the
+    filter is applied *before* any provider lookup, so a one-component run costs
+    one API request rather than one per part. With DigiKey's daily quota at
+    1000 requests, that difference decides whether an exploratory run is
+    affordable at all.
+
+    Matching is a case-insensitive substring test against both the symbol name
+    and the manufacturer part number, so ``--component 1028`` finds the symbol
+    called ``1028`` and the one whose part number contains ``1028``, without the
+    caller needing to know which of the two a given library uses.
+
+    Attributes:
+        patterns: Substrings to match. An empty tuple admits every component.
+    """
+
+    patterns: tuple[str, ...] = ()
+
+    @classmethod
+    def build(cls, text: str | None) -> ComponentFilter:
+        """Construct a filter from a comma separated argument.
+
+        Args:
+            text: Raw ``--component`` text, or ``None`` for no filtering.
+
+        Returns:
+            The configured filter.
+        """
+        if not text:
+            return cls()
+        parts = [part.strip() for part in text.split(",")]
+        return cls(tuple(part for part in parts if part))
+
+    def admits(self, name: str, mpn: str = "") -> bool:
+        """Return whether a component is in scope for this run.
+
+        Args:
+            name: The symbol name, or an empty string for a CSV row.
+            mpn: The manufacturer part number.
+
+        Returns:
+            True when no filter is set, or when either the name or the part
+            number contains one of the patterns.
+        """
+        if not self.patterns:
+            return True
+        haystacks = (name, mpn)
+        return any(
+            pattern.casefold() in haystack.casefold()
+            for pattern in self.patterns
+            for haystack in haystacks
+            if haystack
+        )
+
+    def is_active(self) -> bool:
+        """Return whether any pattern is set.
+
+        Returns:
+            True when the filter would exclude something.
+        """
+        return bool(self.patterns)
+
+    def describe(self) -> str:
+        """Return a one line description for the report header.
+
+        Returns:
+            The active patterns, or ``""`` when nothing is filtered.
+        """
+        return ", ".join(self.patterns)
 
 
 def split_field_list(text: str) -> frozenset[str]:

@@ -79,6 +79,7 @@ class CSVProcessor(BaseProcessor):
         missing: list[str] = []
         failed: list[tuple[str, str]] = []
         column_values: dict[int, dict[str, str]] = {}
+        examined = 0
 
         for row in rows[1:]:
             if not row or mpn_index >= len(row):
@@ -86,6 +87,12 @@ class CSVProcessor(BaseProcessor):
             mpn = row[mpn_index].strip()
             if not mpn:
                 continue
+            reference = next(
+                (cell.strip() for cell in row if cell.strip() and cell.strip() != mpn), ""
+            )
+            if not self.components.admits(reference, mpn):
+                continue
+            examined += 1
 
             existing = {
                 name: (row[i] if i < len(row) else "")
@@ -124,6 +131,7 @@ class CSVProcessor(BaseProcessor):
             written=bool(changes) and not dry,
             lookups=self.cache.stats.describe(),
             failed_parts=tuple(failed),
+            components_examined=examined if self.components.is_active() else None,
         )
         if dry:
             self._report(result)

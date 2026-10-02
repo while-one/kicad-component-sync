@@ -15,7 +15,11 @@ from component_sync.reporting import (
     default_palette,
     render_report,
 )
-from component_sync.selection import FieldSelection, split_field_list
+from component_sync.selection import (
+    ComponentFilter,
+    FieldSelection,
+    split_field_list,
+)
 
 from .conftest import StubProvider
 
@@ -615,3 +619,184 @@ class TestPartialRunSurvives:
             KiCadSymProcessor(Exhausted({}), dry_run=True, colour=False).process(path)
 
         assert asked == ["P-1"], "stopped after the first refusal"
+
+
+class TestComponentFilter:
+    """Selecting a single component is a normal need, and saves requests."""
+
+    def test_no_patterns_admits_everything(self) -> None:
+        """The default is unrestricted."""
+        assert ComponentFilter().admits("ANY", "PART-1")
+        assert not ComponentFilter().is_active()
+
+    def test_matches_symbol_name(self) -> None:
+        """A symbol can be named by its own label."""
+        assert ComponentFilter.build("1028").admits("1028", "OTHER")
+
+    def test_matches_part_number(self) -> None:
+        """Or by its manufacturer part number, which need not match the name."""
+        assert ComponentFilter.build("RC0402FR-0710KL").admits("R1", "RC0402FR-0710KL")
+
+    def test_matching_is_case_insensitive(self) -> None:
+        """The user types a part number as printed, not as stored."""
+        assert ComponentFilter.build("rc0402fr").admits("R1", "RC0402FR-0710KL")
+
+    def test_comma_separated_patterns(self) -> None:
+        """Several components can be selected at once."""
+        chosen = ComponentFilter.build("1028, GRM155")
+        assert chosen.admits("1028", "X")
+        assert chosen.admits("X", "GRM155R61C104KA88D")
+        assert not chosen.admits("OTHER", "RC0402FR-0710KL")
+
+    def test_unmatched_component_is_excluded(self) -> None:
+        """The whole point is excluding the rest."""
+        assert not ComponentFilter.build("1028").admits("OTHER", "RC0402FR-0710KL")
+
+    def test_whitespace_and_empty_entries(self) -> None:
+        """Stray spacing and a trailing comma are harmless."""
+        chosen = ComponentFilter.build(" 1028 , RC0402 ,")
+        assert chosen.patterns == ("1028", "RC0402")
+
+    def test_describe_lists_patterns(self) -> None:
+        """The filter is disclosed rather than silently narrowing a run."""
+        assert ComponentFilter.build("a,b").describe() == "a, b"
+        assert ComponentFilter().describe() == ""
+
+
+class TestComponentFilterInProcessor:
+    """The filter must be applied before any provider lookup."""
+
+    @staticmethod
+    def _library(tmp_path: Path) -> Path:
+        """Return a library holding two symbols.
+
+        Args:
+            tmp_path: pytest temporary directory.
+
+        Returns:
+            Path to the written library.
+        """
+        def block(name: str, part: str) -> str:
+            """Return one symbol block.
+
+            Args:
+                name: Symbol name.
+                part: Manufacturer part number.
+
+            Returns:
+                The symbol source.
+            """
+            return (
+                f'\t(symbol "{name}"\n'
+                f'\t\t(property "Part" "{part}"\n\t\t\t(at 0 0 0)\n\t\t)\n\t)\n'
+            )
+
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(
+            "(kicad_symbol_lib\n\t(version 20231120)\n"
+            + block("WANTED", "GOOD-1")
+            + block("OTHER", "OTHER-1")
+            + ")\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def test_excluded_component_is_never_looked_up(self, tmp_path: Path) -> None:
+        """One request instead of two, which is the real point at 1000/day."""
+        from component_sync.models import ComponentData
+        from component_sync.processors.kicad_processor import KiCadSymProcessor
+        from component_sync.providers.base import BaseProvider
+
+        class Counting(BaseProvider):
+            def __init__(self) -> None:
+                self.asked: list[str] = []
+
+            def authenticate(self) -> None:
+                """No credentials needed."""
+
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                self.asked.append(mpn)
+                return ComponentData(mpn=mpn, manufacturer="YAGEO")
+
+        provider = Counting()
+        result = KiCadSymProcessor(
+            provider,
+            dry_run=True,
+            colour=False,
+            components=ComponentFilter.build("WANTED"),
+        ).process(self._library(tmp_path))
+
+        assert provider.asked == ["GOOD-1"]
+        assert result.components_examined == 1
+        assert {c.identifier for c in result.changes} == {"WANTED"}
+
+    def test_filtered_out_component_is_not_reported_missing(
+        self, tmp_path: Path
+    ) -> None:
+        """A component never asked about must not appear as unstocked."""
+        from component_sync.exceptions import PartNotFoundError
+        from component_sync.models import ComponentData
+        from component_sync.processors.kicad_processor import KiCadSymProcessor
+        from component_sync.providers.base import BaseProvider
+
+        class Picky(BaseProvider):
+            def authenticate(self) -> None:
+                """No credentials needed."""
+
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                if mpn == "OTHER-1":
+                    raise PartNotFoundError(mpn)
+                return ComponentData(mpn=mpn, manufacturer="YAGEO")
+
+        result = KiCadSymProcessor(
+            Picky(),
+            dry_run=True,
+            colour=False,
+            components=ComponentFilter.build("WANTED"),
+        ).process(self._library(tmp_path))
+
+        assert result.missing_parts == ()
+        assert not result.incomplete
+
+    def test_unfiltered_run_reports_no_count(self, tmp_path: Path) -> None:
+        """Without a filter there is no count to show."""
+        from component_sync.models import ComponentData
+        from component_sync.processors.kicad_processor import KiCadSymProcessor
+        from component_sync.providers.base import BaseProvider
+
+        class Simple(BaseProvider):
+            def authenticate(self) -> None:
+                """No credentials needed."""
+
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                return ComponentData(mpn=mpn, manufacturer="YAGEO")
+
+        result = KiCadSymProcessor(Simple(), dry_run=True, colour=False).process(
+            self._library(tmp_path)
+        )
+        assert result.components_examined is None
+        assert "filter:" not in render_report(
+            result, palette=Palette(False), selection=FieldSelection()
+        )
+
+    def test_filter_is_disclosed_in_the_report(self, tmp_path: Path) -> None:
+        """A narrowed run says so, so a quiet report is not mistaken for no work."""
+        from component_sync.models import ComponentData
+        from component_sync.processors.kicad_processor import KiCadSymProcessor
+        from component_sync.providers.base import BaseProvider
+
+        class Simple(BaseProvider):
+            def authenticate(self) -> None:
+                """No credentials needed."""
+
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                return ComponentData(mpn=mpn, manufacturer="YAGEO")
+
+        result = KiCadSymProcessor(
+            Simple(),
+            dry_run=True,
+            colour=False,
+            components=ComponentFilter.build("WANTED"),
+        ).process(self._library(tmp_path))
+        out = render_report(result, palette=Palette(False), selection=FieldSelection())
+        assert "filter: 1 component(s) in scope" in out

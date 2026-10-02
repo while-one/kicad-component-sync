@@ -234,6 +234,8 @@ class ProcessResult:
             stock this" and "the distributor refused to answer" call for
             different actions, and conflating them hides a transient fault as a
             permanent data problem.
+        components_examined: How many components the filter let through and that
+            were actually looked up, or ``None`` when no filter was applied.
     """
 
     file_path: str
@@ -243,6 +245,7 @@ class ProcessResult:
     written: bool = False
     lookups: str | None = None
     failed_parts: tuple[tuple[str, str], ...] = ()
+    components_examined: int | None = None
 
     @property
     def incomplete(self) -> bool:

@@ -97,6 +97,30 @@ python -m component_sync.cli -n --skip Description lib.kicad_sym
 python -m component_sync.cli -n --ignore-case lib.kicad_sym
 ```
 
+`--component` narrows a run to individual components, matched case-insensitively
+against both the symbol name and the manufacturer part number, so it does not
+matter which of the two your library uses:
+
+```bash
+# One component, by symbol name or by part number
+python -m component_sync.cli -n --component 1028 lib.kicad_sym
+python -m component_sync.cli -n --component RC0402FR-0736K5L lib.kicad_sym
+
+# Several at once
+python -m component_sync.cli -n --component 'GRM155,RX0402' lib.kicad_sym
+```
+
+The filter is applied **before any provider lookup**, so an excluded component
+costs no request: `--component 1028` spends 2 requests rather than the ~60 a
+full run needs. That matters at DigiKey's 1000/day quota, and a filtered-out
+component is never listed as unresolved. A narrowed run states its scope, so a
+quiet report is not mistaken for a clean one:
+
+```
+DRY RUN  lib.kicad_sym
+  filter: 1 component(s) in scope
+```
+
 `--only` takes precedence over `--skip`. A run that filtered something out says
 so in its footer rather than silently reporting less:
 
@@ -434,7 +458,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 292 tests
+python -m pytest -q                     # 304 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

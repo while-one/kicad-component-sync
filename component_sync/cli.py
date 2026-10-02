@@ -20,7 +20,7 @@ from .processors.csv_processor import CSVProcessor
 from .processors.kicad_processor import KiCadSymProcessor
 from .providers.base import BaseProvider, ProviderRole
 from .providers.factory import ProviderFactory
-from .selection import FieldSelection
+from .selection import ComponentFilter, FieldSelection
 
 __all__ = ["main", "build_parser", "select_processor"]
 
@@ -81,6 +81,17 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Data provider to query for component values (default: digikey). "
             "Sourcing providers are not offered here; they run in sequence."
+        ),
+    )
+    parser.add_argument(
+        "--component",
+        default=None,
+        metavar="TEXT",
+        help=(
+            "Restrict the run to components whose symbol name or part number "
+            "contains TEXT. Comma separated for several. Matched case "
+            "insensitively, and applied before any lookup, so an excluded "
+            "component costs no API request."
         ),
     )
     parser.add_argument(
@@ -240,6 +251,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 colour=False if args.no_color else None,
                 width=args.width,
                 sources=sources,
+                components=ComponentFilter.build(args.component),
             )
             result = processor.process(input_file)
     except ComponentSyncError as exc:

@@ -17,7 +17,7 @@ from ..exceptions import (  # noqa: F401  (FileFormatError re-exported for subcl
 from ..models import ChangeAction, ComponentData, ProcessResult, PropertyChange
 from ..providers.base import BaseProvider
 from ..reporting import Palette, default_palette, render_report
-from ..selection import FieldSelection
+from ..selection import ComponentFilter, FieldSelection
 
 __all__ = ["BaseProcessor", "atomic_write"]
 
@@ -92,6 +92,7 @@ class BaseProcessor(ABC):
         colour: bool | None = None,
         width: int = 60,
         sources: tuple[BaseProvider, ...] = (),
+        components: ComponentFilter | None = None,
     ) -> None:
         """Initialise the processor.
 
@@ -104,14 +105,18 @@ class BaseProcessor(ABC):
             width: Maximum width for each value rendered in the report.
             sources: Sourcing providers, consulted after the data provider and
                 contributing purchasing links only.
+            components: Restricts the run to matching components, applied before
+                any lookup so an excluded component costs no request.
         """
         self.provider = provider
         self.sources = sources
         self.dry_run = dry_run
         self.cache = LookupCache()
         self.fields = fields if fields is not None else FieldSelection()
+        self.components = components if components is not None else ComponentFilter()
         self._colour = colour
         self.width = width
+        self.seen_count = 0
 
     def palette(self) -> Palette:
         """Return the colour helper this processor should report with.

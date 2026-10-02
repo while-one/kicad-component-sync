@@ -103,6 +103,7 @@ class KiCadSymProcessor(BaseProcessor):
         missing: list[str] = []
         failed: list[tuple[str, str]] = []
         seen: set[str] = set()
+        examined = 0
 
         for symbol in root.children("symbol"):
             name_node = symbol.items[1] if len(symbol.items) > 1 else None
@@ -117,6 +118,9 @@ class KiCadSymProcessor(BaseProcessor):
                 continue
             mpn = mpn.strip()
             seen.add(mpn)
+            if not self.components.admits(symbol_name, mpn):
+                continue
+            examined += 1
 
             existing = self._properties(symbol)
             wanted, reason = self._desired(mpn, existing)
@@ -146,6 +150,7 @@ class KiCadSymProcessor(BaseProcessor):
             written=bool(edits),
             lookups=self.cache.stats.describe(),
             failed_parts=tuple(failed),
+            components_examined=examined if self.components.is_active() else None,
         )
         if dry:
             self._report(result)

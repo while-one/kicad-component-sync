@@ -280,6 +280,13 @@ def render_report(
 
     lines: list[str] = []
     lines.append(pal(pal.HEADING, f"DRY RUN  {result.file_path}"))
+    if result.components_examined is not None:
+        lines.append(
+            pal(
+                pal.DIM,
+                f"  filter: {result.components_examined} component(s) in scope",
+            )
+        )
     lines.append("")
 
     # The counts first: this is the part that answers "what needs attention".
