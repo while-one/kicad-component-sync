@@ -25,11 +25,13 @@ from component_sync.exceptions import (
     ConfigurationError,
     PartNotFoundError,
     ProviderAPIError,
+    RateLimitError,
 )
 from component_sync.providers.base import ProviderRole
 from component_sync.providers.mouser import (
     LINK_FIELD,
     MouserProvider,
+    _is_rate_limit,
     _normalise_manufacturer,
     _same_manufacturer,
 )
@@ -375,9 +377,17 @@ class TestNotFoundAndErrors:
     def test_non_200_is_reported(self) -> None:
         """A genuine HTTP failure is wrapped."""
         provider = make_provider()
-        session_of(provider).post.return_value = response(500)
-        with pytest.raises(ProviderAPIError, match="HTTP 500"):
+        session_of(provider).post.return_value = response(500, {"detail": "server error"})
+        with pytest.raises(ProviderAPIError, match="HTTP 500: server error"):
             provider.fetch_source_links(MPN)
+
+    def test_status_is_not_repeated(self) -> None:
+        """The message must not read 'HTTP 500: HTTP 500'."""
+        provider = make_provider()
+        session_of(provider).post.return_value = response(500, {"detail": "boom"})
+        with pytest.raises(ProviderAPIError) as info:
+            provider.fetch_source_links(MPN)
+        assert "HTTP 500: HTTP" not in info.value.message
 
     def test_transport_error_is_wrapped(self) -> None:
         """A connection failure is wrapped, not propagated raw."""
@@ -646,3 +656,106 @@ class TestSequencing:
 
         assert result.changes, "the data provider's work is still reported"
         assert "Mouser" not in {c.field_name for c in result.changes}
+
+
+class TestRateLimit:
+    """Mouser answers a rate limit with HTTP 403, not 429.
+
+    The body says ``Code: "TooManyRequests"`` and
+    ``ResourceKey: "MaxCallPerMinute"``. The documented ceiling is 30 calls per
+    minute, and this provider sends one part per call, so a 57-part run exceeds
+    it. Treating 403 as permanent lost the sourcing links partway through
+    instead of waiting.
+    """
+
+    @staticmethod
+    def _refusal() -> mock.MagicMock:
+        """Return the 403 Mouser returns when the per-minute limit is exceeded.
+
+        Returns:
+            A mock response.
+        """
+        resp = mock.MagicMock()
+        resp.status_code = 403
+        resp.text = '{"Errors":[]}'
+        resp.headers = {}
+        resp.json.return_value = {
+            "Errors": [
+                {
+                    "Id": 0,
+                    "Code": "TooManyRequests",
+                    "Message": "Maximum calls per minute exceeded.",
+                    "ResourceKey": "MaxCallPerMinute",
+                }
+            ],
+            "SearchResults": None,
+        }
+        return resp
+
+    def test_403_with_a_rate_limit_body_is_retried(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A limit worth waiting out must not be treated as permanent."""
+        monkeypatch.setattr("component_sync.providers.mouser.time.sleep", lambda _s: None)
+        attempts = {"n": 0}
+
+        def search(url: str, **_: object) -> mock.MagicMock:
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return self._refusal()
+            return response(200, payload(MPN))
+
+        provider = make_provider()
+        session_of(provider).post.side_effect = search
+        assert provider.fetch_source_links(MPN)[LINK_FIELD]
+        assert attempts["n"] == 2, "retried once and then succeeded"
+
+    def test_persistent_limit_is_reported_as_a_rate_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Retries are bounded, and the result names the real problem."""
+        monkeypatch.setattr("component_sync.providers.mouser.time.sleep", lambda _s: None)
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: self._refusal()
+        with pytest.raises(RateLimitError, match="30 calls per minute"):
+            provider.fetch_source_links(MPN)
+
+    def test_a_genuine_403_is_not_retried(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A permission failure is not a rate limit and must not be retried."""
+        monkeypatch.setattr("component_sync.providers.mouser.time.sleep", lambda _s: None)
+        forbidden = response(403, {"Errors": [{"Message": "Access denied"}]})
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: forbidden
+        with pytest.raises(ProviderAPIError, match="Access denied"):
+            provider.fetch_source_links(MPN)
+        assert session_of(provider).post.call_count == 1
+
+    def test_429_is_also_treated_as_a_rate_limit(self) -> None:
+        """The conventional status is handled the same way."""
+        assert _is_rate_limit(429, {})
+        assert _is_rate_limit(403, {"Errors": [{"Code": "TooManyRequests"}]})
+        assert _is_rate_limit(403, {"Errors": [{"ResourceKey": "MaxCallPerMinute"}]})
+        assert not _is_rate_limit(403, {"Errors": [{"Message": "Access denied"}]})
+        assert not _is_rate_limit(500, {})
+
+    def test_requests_are_paced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A run stays under 30 calls per minute without being told to."""
+        waits: list[float] = []
+        clock = {"t": 1000.0}
+
+        monkeypatch.setattr(
+            "component_sync.providers.mouser.time.monotonic", lambda: clock["t"]
+        )
+        def fake_sleep(seconds: float) -> None:
+            waits.append(seconds)
+            clock["t"] += seconds
+
+        monkeypatch.setattr("component_sync.providers.mouser.time.sleep", fake_sleep)
+        provider = make_provider()
+        session_of(provider).post.return_value = response(200, payload(MPN))
+        for _ in range(3):
+            provider.fetch_source_links(MPN)
+        assert waits, "no pacing between requests"
+        assert all(w >= 2.0 for w in waits), "under 30 calls per minute"

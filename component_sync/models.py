@@ -8,10 +8,36 @@ processors never need to know which distributor answered.
 
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 
 __all__ = ["ComponentData", "ProcessResult", "PropertyChange", "ChangeAction"]
+
+
+def _leading_number(text: str) -> float | None:
+    """Return the number at the start of a formatted bound, if there is one.
+
+    Bounds are stored formatted, for example ``"5.5 V"``, ``"-55 C"`` or
+    ``"+125 C"``. Only the magnitude is needed for an ordering comparison, so a
+    value that does not begin with a number yields ``None`` and is not
+    validated.
+
+    Args:
+        text: A formatted bound.
+
+    Returns:
+        The leading number, or ``None`` when the text does not start with one.
+    """
+    match = re.match(r"\s*([+-]?\d+(?:\.\d+)?)", text)
+    if match is None:
+        return None
+    try:
+        value = float(match.group(1))
+    except ValueError:  # pragma: no cover - the regex guarantees a number
+        return None
+    return value if math.isfinite(value) else None
 
 
 class ChangeAction(Enum):
@@ -83,6 +109,32 @@ class ComponentData:
     digikey_url: str = ""
     source_links: dict[str, str] = field(default_factory=dict)
     raw_parameters: dict[str, str] = field(default_factory=dict)
+
+    #: Field pairs whose lower and upper bound are validated against each other.
+    _BOUND_PAIRS = (("voltage_min", "voltage_max"), ("temp_min", "temp_max"))
+
+    def __post_init__(self) -> None:
+        """Reject a lower bound that exceeds its upper bound.
+
+        These values are formatted strings, so validation reads the leading
+        number out of each. DigiKey publishes multi-rail supplies such as
+        ``1.65V ~ 1.95V, 3V ~ 3.6V``, where a careless parse could easily
+        produce an inverted pair, and an inverted range in a symbol library is
+        worse than no range at all: it looks authoritative and is wrong.
+
+        Raises:
+            ValueError: If both bounds are numeric and the lower exceeds the
+                upper. Providers that build bounds from a vendor string should
+                fall back to recording the verbatim text instead.
+        """
+        for low_name, high_name in self._BOUND_PAIRS:
+            low = _leading_number(getattr(self, low_name))
+            high = _leading_number(getattr(self, high_name))
+            if low is not None and high is not None and low > high:
+                raise ValueError(
+                    f"{low_name}={getattr(self, low_name)!r} exceeds "
+                    f"{high_name}={getattr(self, high_name)!r}"
+                )
 
     @staticmethod
     def _fmt_bound(value: float, unit: str, *, temperature: bool) -> str:

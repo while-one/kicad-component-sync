@@ -31,7 +31,9 @@ from component_sync.exceptions import (
     RateLimitError,
 )
 from component_sync.models import ComponentData
+from component_sync.providers.base import BaseProvider
 from component_sync.providers.digikey import PRODUCT_URL, TOKEN_URL, DigiKeyProvider
+from component_sync.ranges import parse_range
 
 MPN = "GRM155R61C104KA88D"
 
@@ -831,3 +833,104 @@ class TestSessionLifecycle:
         assert len([c for c in session_of(provider).method_calls
                     if c.args and c.args[0] == TOKEN_URL]) == 1
 
+
+
+class TestInvertedBoundsAreRefused:
+    """A lower bound above its upper bound must not reach the library.
+
+    An inverted range looks authoritative and is wrong, which is worse than no
+    range at all. DigiKey publishes multi-rail supplies such as
+    ``1.65V ~ 1.95V, 3V ~ 3.6V``, so a careless parse could produce one.
+    """
+
+    def test_voltage_inversion_is_refused(self) -> None:
+        """A provider cannot construct an inverted voltage pair."""
+        with pytest.raises(ValueError, match="exceeds"):
+            ComponentData(mpn="X", voltage_min="5.5 V", voltage_max="1.8 V")
+
+    def test_temperature_inversion_is_refused(self) -> None:
+        """The same holds for a temperature pair."""
+        with pytest.raises(ValueError, match="exceeds"):
+            ComponentData(mpn="X", temp_min="+125 C", temp_max="-55 C")
+
+    @pytest.mark.parametrize(
+        ("low", "high"),
+        [
+            ("1.8 V", "5.5 V"),
+            ("-55 C", "+85 C"),
+            ("1.8 V", ""),
+            ("", "5.5 V"),
+            ("0 V", "0 V"),
+        ],
+    )
+    def test_valid_bounds_are_accepted(self, low: str, high: str) -> None:
+        """Normal ranges, single bounds and equal bounds all pass."""
+        assert ComponentData(
+            mpn="X", voltage_min=low, voltage_max=high, temp_min=low, temp_max=high
+        )
+
+    def test_verbatim_text_is_unaffected(self) -> None:
+        """A lone vendor string carries no ordering to check."""
+        assert ComponentData(mpn="X", voltage_text="16 VDC")
+
+    def test_a_range_spanning_zero_is_valid(self) -> None:
+        """A negative lower bound is not an inversion."""
+        assert ComponentData(mpn="X", temp_min="-55 C", temp_max="+85 C")
+
+    def test_non_numeric_bounds_are_not_validated(self) -> None:
+        """Text that does not begin with a number is left alone."""
+        assert ComponentData(mpn="X", voltage_min="see datasheet", voltage_max="1.8 V")
+
+    def test_backwards_vendor_range_is_normalised_not_refused(self) -> None:
+        """A vendor that writes the bounds the wrong way round is still usable.
+
+        ``parse_range`` swaps them before formatting, so the real provider path
+        produces a correct ordered pair rather than raising.
+        """
+        bounds = parse_range("5.5 V ~ 1.8 V")
+        assert bounds is not None
+        low = ComponentData._fmt_bound(
+            bounds.low or 0.0, bounds.unit, temperature=False
+        )
+        high = ComponentData._fmt_bound(
+            bounds.high or 0.0, bounds.unit, temperature=False
+        )
+        assert low == "1.8 V" and high == "5.5 V"
+        assert ComponentData(mpn="X", voltage_min=low, voltage_max=high)
+
+    def test_a_bad_record_does_not_abort_the_run(
+        self, tmp_path: Path, kicad_sym_text: str
+    ) -> None:
+        """A provider fault is recorded against the part, not raised at the run."""
+        from component_sync.exceptions import RateLimitError  # noqa: F401
+        from component_sync.processors.kicad_processor import KiCadSymProcessor
+
+        class Bad(BaseProvider):
+            def authenticate(self) -> None:
+                """No credentials needed."""
+
+            def fetch_component_data(self, mpn: str) -> ComponentData:
+                """Return an inverted record.
+
+                Args:
+                    mpn: Ignored part number.
+
+                Returns:
+                    A deliberately invalid record.
+
+                Raises:
+                    ValueError: Always, from the bound validation.
+                """
+                return ComponentData(
+                    mpn=mpn, voltage_min="5.5 V", voltage_max="1.8 V"
+                )
+
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(kicad_sym_text, encoding="utf-8")
+        result = KiCadSymProcessor(
+            Bad(), dry_run=True, colour=False
+        ).process(path)
+
+        assert [mpn for mpn, _ in result.failed_parts] == [MPN]
+        assert "exceeds" in result.failed_parts[0][1]
+        assert result.changes == ()

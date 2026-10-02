@@ -143,3 +143,58 @@ class TestPropertyMapping:
         """Absent values never produce blank placeholders."""
         data = ComponentData(mpn="X", manufacturer="Murata")
         assert data.as_properties() == {"Manufacturer": "Murata"}
+
+
+class TestScientificNotation:
+    """An exponent belongs to the number, not to the next one.
+
+    Without exponent support in the number pattern, the loose scan found two
+    numbers inside ``1e400`` -- ``1`` and ``400`` -- and reported a range of 1 to
+    400. ``1.8e3 V ~ 2.2e3 V`` became 1.8 to 3.0 V. Both looked plausible and
+    both would have been written to ``Voltage Min``/``Max``.
+    """
+
+    def test_orphaned_exponent_is_not_two_numbers(self) -> None:
+        """A malformed number yields nothing rather than a spurious range."""
+        assert parse_range("1e400") is None
+
+    def test_real_exponents_are_understood(self) -> None:
+        """A genuine scientific-notation range is read correctly."""
+        bounds = parse_range("1.8e3 V ~ 2.2e3 V")
+        assert bounds is not None
+        assert bounds.low == 1800.0
+        assert bounds.high == 2200.0
+        assert bounds.unit == "V"
+
+    @pytest.mark.parametrize(
+        ("text", "low", "high"),
+        [
+            ("1e3 ~ 2e3 V", 1000.0, 2000.0),
+            ("-40e0 C ~ 85e0 C", -40.0, 85.0),
+            ("1.5e-3 V ~ 2.5e-3 V", 0.0015, 0.0025),
+        ],
+    )
+    def test_exponent_forms(self, text: str, low: float, high: float) -> None:
+        """Positive, negative and fractional exponents all work."""
+        bounds = parse_range(text)
+        assert bounds is not None
+        assert bounds.low == pytest.approx(low)
+        assert bounds.high == pytest.approx(high)
+
+    def test_overflowing_literal_yields_nothing(self) -> None:
+        """A bound of infinity is not a limit."""
+        assert parse_range("1e400 V ~ 2e400 V") is None
+        assert parse_range("1e400 V") is None
+
+    def test_exponent_does_not_leak_into_a_neighbouring_parse(self) -> None:
+        """One bad token must not poison the rest of a string."""
+        bounds = parse_range("[1e400 5 V]")
+        assert bounds is None or bounds.high == 5.0
+
+    @pytest.mark.parametrize(
+        "text",
+        ["-55°C ~ 85°C", "1.8V ~ 5.5V", "1.65 V ~ 5.5 V", "16V", "6.3 V", "50 VDC"],
+    )
+    def test_ordinary_ranges_are_unchanged(self, text: str) -> None:
+        """The fix must not disturb strings that were already correct."""
+        assert parse_range(text) is not None

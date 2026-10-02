@@ -17,8 +17,6 @@ dev = ["pytest>=8", "mypy>=1.8", "types-requests"]
 [project.scripts]
 component-sync = "component_sync.cli:main"
 
-[project.entry-points."kicad.plugin"]
-component_sync = "component_sync.plugin:register"
 
 [tool.setuptools.packages.find]
 include = ["component_sync*"]
@@ -57,4 +55,3 @@ ignore = ["D203", "D213", "D406", "D407", "D413", "ANN101", "ANN102"]
 "**/tests/*" = ["D103", "ANN", "D105"]
 # KiCad's embedded API ships no type information; `Any` is the only honest
 # annotation for its symbol and frame objects.
-"component_sync/plugin.py" = ["ANN401"]

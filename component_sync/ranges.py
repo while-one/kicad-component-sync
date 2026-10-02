@@ -17,8 +17,14 @@ import re
 
 __all__ = ["RangeBounds", "parse_range"]
 
-#: Numeric literal with optional sign and decimal point.
-_NUMBER = r"[+-]?\d+(?:\.\d+)?"
+#: Numeric literal with optional sign, decimal point and exponent.
+#:
+#: The exponent must be consumed as part of the number. Without it the loose
+#: scan found two numbers in ``1e400`` -- ``1`` and ``400`` -- and reported a
+#: range of 1 to 400, while ``1.8e3 V ~ 2.2e3 V`` became 1.8 to 3.0 V. Both are
+#: plausible-looking and completely wrong, and both feed ``Voltage Min``/``Max``
+#: and ``Temperature Min``/``Max`` in the symbol library.
+_NUMBER = r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?"
 
 #: Characters vendors use as range separators, ordered so the longest match first.
 _SEPARATORS = r"(?:\s*(?:/|~|-|–|—|\bto\b|\bthrough\b|\.\.\.)\s*)"
@@ -149,6 +155,11 @@ def parse_range(text: str) -> RangeBounds | None:
     match = _RANGE_RE.match(raw)
     if match:
         low, high = float(match.group("low")), float(match.group("high"))
+        if not (is_finite(low) and is_finite(high)):
+            # An overflowing literal such as 1e400 parses as infinity. A bound
+            # of infinity is not a limit, so nothing is reported rather than
+            # something that looks like a real maximum.
+            return None
         unit = _normalise_unit(match.group("hunit") or match.group("lunit"))
         is_temperature = unit in ("C", "F")
         if low > high:
@@ -159,6 +170,8 @@ def parse_range(text: str) -> RangeBounds | None:
     match = _SINGLE_RE.match(raw)
     if match:
         value = float(match.group("value"))
+        if not is_finite(value):
+            return None
         unit = _normalise_unit(match.group("unit"))
         is_temperature = unit in ("C", "F")
         # A bare "125 C" is ambiguous: it is conventionally the upper limit.
@@ -210,6 +223,8 @@ def _search_fragment(text: str) -> RangeBounds | None:
     if len(numbers) >= 2:
         low = float(numbers[0].group())
         high = float(numbers[1].group())
+        if not (is_finite(low) and is_finite(high)):
+            return None
         if low <= high:
             unit = _unit_after(text, numbers[1].end())
             return RangeBounds(low, high, unit, text, unit in ("C", "F"))
@@ -230,6 +245,8 @@ def _parse_loose(text: str) -> RangeBounds | None:
         return None
     low = float(numbers[0].group())
     high = float(numbers[1].group())
+    if not (is_finite(low) and is_finite(high)):
+        return None
     if low > high:
         low, high = high, low
     unit = _unit_after(text, numbers[1].end())

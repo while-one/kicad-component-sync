@@ -248,9 +248,12 @@ class BaseProcessor(ABC):
                 raise
             LOGGER.warning("Lookup failed for %r: %s", mpn, exc)
             return None, exc.message
-        except ComponentSyncError as exc:
+        except (ComponentSyncError, ValueError) as exc:
+            # ValueError covers a provider that constructs a nonsensical
+            # record, such as a lower bound above its upper. It is recorded
+            # against this part rather than aborting the run.
             LOGGER.warning("Lookup failed for %r: %s", mpn, exc)
-            return None, exc.message
+            return None, str(exc)
 
     def _classify(
         self,

@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from typing import Any
 
 import requests
@@ -37,6 +38,7 @@ from ..exceptions import (
     ConfigurationError,
     PartNotFoundError,
     ProviderAPIError,
+    RateLimitError,
 )
 from ..models import ComponentData
 from .base import BaseProvider, ProviderRole
@@ -55,7 +57,51 @@ DEFAULT_TIMEOUT = 30.0
 LINK_FIELD = "Mouser"
 
 #: Most part numbers Mouser accepts in one request, joined by ``|``.
+#:
+#: Unused for now: the processor queries one part number at a time. A future
+#: batch pass would cut a 57-part run from 57 requests to 6.
 MAX_PARTS_PER_REQUEST = 10
+
+#: Minimum seconds between Mouser requests.
+#:
+#: Mouser allows 30 calls per minute, so one call every 2.1 seconds stays under
+#: the ceiling without needing to retry.
+_MIN_REQUEST_INTERVAL = 2.1
+
+#: How many times to retry a request refused by the per-minute limit.
+_MAX_RETRIES = 3
+
+#: Upper bound on a single wait, so a malformed ``Retry-After`` cannot hang a run.
+_MAX_BACKOFF = 60.0
+
+
+def _is_rate_limit(status: int, payload: dict[str, Any]) -> bool:
+    """Return whether a refusal is really a per-minute rate limit.
+
+    Mouser answers a rate limit with **HTTP 403**, not 429, and identifies it in
+    the body with ``Code: "TooManyRequests"`` and
+    ``ResourceKey: "MaxCallPerMinute"``. Treating 403 as a permanent failure
+    meant a run lost its sourcing links partway through instead of waiting.
+
+    Args:
+        status: The HTTP status code.
+        payload: The decoded response body.
+
+    Returns:
+        True when the refusal is a rate limit worth waiting out.
+    """
+    if status == 429:
+        return True
+    if status != 403:
+        return False
+    for error in payload.get("Errors") or []:
+        if not isinstance(error, dict):
+            continue
+        code = str(error.get("Code", ""))
+        key = str(error.get("ResourceKey", ""))
+        if "toomany" in code.replace(" ", "").casefold() or "maxcall" in key.casefold():
+            return True
+    return False
 
 
 class MouserProvider(BaseProvider):
@@ -91,6 +137,8 @@ class MouserProvider(BaseProvider):
         self.timeout = timeout
         self._session = session if session is not None else requests.Session()
         self._owns_session = session is None
+        #: Monotonic timestamp of the last request, for pacing.
+        self._last_request: float | None = None
 
     def authenticate(self) -> None:
         """Validate that an API key is configured.
@@ -171,6 +219,21 @@ class MouserProvider(BaseProvider):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+    def _pace(self) -> None:
+        """Sleep if the previous request was too recent.
+
+        Keeps a run under Mouser's 30 calls per minute without relying on the API
+        to refuse work. Measuring between request starts means the pacing holds
+        even when a response is slow.
+        """
+        if self._last_request is None:
+            self._last_request = time.monotonic()
+            return
+        elapsed = time.monotonic() - self._last_request
+        if elapsed < _MIN_REQUEST_INTERVAL:
+            time.sleep(_MIN_REQUEST_INTERVAL - elapsed)
+        self._last_request = time.monotonic()
+
     def _exact_matches(self, mpn: str) -> list[dict[str, Any]]:
         """Return every product whose manufacturer part number equals ``mpn``.
 
@@ -186,6 +249,7 @@ class MouserProvider(BaseProvider):
             Every exactly matching product record.
 
         Raises:
+            RateLimitError: If the per-minute limit survives every retry.
             ProviderAPIError: On a transport failure, a non-200 response, a
                 malformed body, or an error the API reported.
         """
@@ -195,42 +259,68 @@ class MouserProvider(BaseProvider):
                 "partSearchOptions": "Exact",
             }
         }
-        try:
-            response = self._session.post(
-                f"{SEARCH_URL}?apiKey={self.api_key}",
-                headers={"Content-Type": "application/json", "Accept": "application/json"},
-                json=body,
-                timeout=self.timeout,
-            )
-        except requests.RequestException as exc:
-            raise ProviderAPIError(f"Mouser search failed for {mpn!r}: {exc}") from exc
+        attempt = 0
+        while True:
+            self._pace()
+            try:
+                response = self._session.post(
+                    f"{SEARCH_URL}?apiKey={self.api_key}",
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                    json=body,
+                    timeout=self.timeout,
+                )
+            except requests.RequestException as exc:
+                raise ProviderAPIError(f"Mouser search failed for {mpn!r}: {exc}") from exc
 
-        if response.status_code != 200:
-            raise ProviderAPIError(
-                f"Mouser search for {mpn!r} failed with HTTP "
-                f"{response.status_code}: {_summarise(response)}"
-            )
-        try:
-            payload: dict[str, Any] = response.json()
-        except ValueError as exc:
-            raise ProviderAPIError(f"Malformed Mouser response for {mpn!r}: {exc}") from exc
+            try:
+                payload: dict[str, Any] = response.json()
+            except ValueError as exc:
+                raise ProviderAPIError(
+                    f"Malformed Mouser response for {mpn!r}: {exc}"
+                ) from exc
 
-        errors = payload.get("Errors") or []
-        if errors:
-            # A refused key arrives as HTTP 200, so the body is the only signal.
-            messages = "; ".join(
-                str(error.get("Message", "")) for error in errors if isinstance(error, dict)
-            )
-            raise ProviderAPIError(
-                f"Mouser rejected the request for {mpn!r}: {messages or 'unspecified error'}"
-            )
+            if _is_rate_limit(response.status_code, payload):
+                attempt += 1
+                if attempt > _MAX_RETRIES:
+                    raise RateLimitError(
+                        f"Mouser per-minute limit still refusing {mpn!r} after "
+                        f"{_MAX_RETRIES} retries (30 calls per minute).",
+                        retry_after=int(_MIN_REQUEST_INTERVAL * attempt),
+                    )
+                wait = min(_MIN_REQUEST_INTERVAL * (2**attempt), _MAX_BACKOFF)
+                LOGGER.warning(
+                    "Mouser rate limit hit for %r; waiting %.1fs (retry %d/%d)",
+                    mpn,
+                    wait,
+                    attempt,
+                    _MAX_RETRIES,
+                )
+                time.sleep(wait)
+                continue
 
-        wanted = mpn.strip().casefold()
-        return [
-            part
-            for part in (payload.get("SearchResults") or {}).get("Parts") or []
-            if str(part.get("ManufacturerPartNumber", "")).strip().casefold() == wanted
-        ]
+            if response.status_code != 200:
+                raise ProviderAPIError(
+                    f"Mouser search for {mpn!r} failed: "
+                    f"{_summarise(response, payload)}"
+                )
+
+            errors = payload.get("Errors") or []
+            if errors:
+                # A refused key arrives as HTTP 200, so the body is the only signal.
+                messages = "; ".join(
+                    str(error.get("Message", "")) for error in errors if isinstance(error, dict)
+                )
+                raise ProviderAPIError(
+                    f"Mouser rejected the request for {mpn!r}: "
+                    f"{messages or 'unspecified error'}"
+                )
+
+            wanted = mpn.strip().casefold()
+            return [
+                part
+                for part in (payload.get("SearchResults") or {}).get("Parts") or []
+                if str(part.get("ManufacturerPartNumber", "")).strip().casefold() == wanted
+            ]
 
 
 def _normalise_manufacturer(name: str) -> str:
@@ -323,25 +413,27 @@ def _describe(part: dict[str, Any]) -> str:
     return f"{_manufacturer_of(part) or 'unknown'}: {description}"
 
 
-def _summarise(response: requests.Response) -> str:
+def _summarise(response: requests.Response, payload: dict[str, Any]) -> str:
     """Return a readable one line description of a failed response.
 
     Args:
         response: The failed response.
+        payload: The already-decoded body, if one could be read.
 
     Returns:
         A single line naming the status and any reason the body gave.
     """
-    try:
-        payload = response.json()
-    except ValueError:
-        return " ".join(response.text.split())[:160] or f"HTTP {response.status_code}"
-    if isinstance(payload, dict):  # pragma: no cover - defensive
-        for key in ("message", "Message", "detail"):
-            value = payload.get(key)
-            if isinstance(value, str) and value.strip():
-                return f"HTTP {response.status_code}: {' '.join(value.split())}"
-    return f"HTTP {response.status_code}"
+    for key in ("message", "Message", "detail"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return f"HTTP {response.status_code}: {' '.join(value.split())}"
+    for error in payload.get("Errors") or []:
+        if isinstance(error, dict):
+            message = str(error.get("Message", "")).strip()
+            if message:
+                return f"HTTP {response.status_code}: {' '.join(message.split())}"
+    text = " ".join(response.text.split())[:160]
+    return f"HTTP {response.status_code}: {text}" if text else f"HTTP {response.status_code}"
 
 
 def product_url(part: dict[str, Any]) -> str:

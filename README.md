@@ -155,10 +155,12 @@ python -m component_sync.cli ~/path/to/mylib.kicad_sym
 # 4. Schematic:     Tools -> Update Symbols from Library
 ```
 
-`component_sync/plugin.py` exists as a best-effort bridge that reaches for the
-editor through the wx application object. Treat it as experimental: it depends
-on KiCad internals that could not be verified without an interactive GUI
-session.
+An earlier version of this package shipped a `plugin.py` that reached for the
+editor through the wx application object. It was removed: it depended on KiCad
+internals that could not be verified without an interactive GUI session, and
+unverified code in a package whose value is that everything else *is* verified
+is a liability. A button in the symbol editor remains the one thing this tool
+cannot do.
 
 ## Matching: what the key actually is
 
@@ -445,6 +447,10 @@ the CLI automatically.
 
 - **The daily quota is real.** 1000 requests/day, resetting at midnight UTC.
   A full run costs about 70. See *Rate limits* above.
+- **Mouser requests are not batched.** The API accepts up to 10 part numbers per
+  call, which would turn a 57-part run from 57 requests into 6, but the
+  processor queries one part at a time. Requests are therefore paced to stay
+  under Mouser's 30 calls per minute, which costs a couple of minutes per run.
 - **The cache is per-run, not on disk.** Starting a second run re-requests
   everything. Persisting responses across runs would go stale, and a stale price
   or stock figure is worse than a slow run.
@@ -458,7 +464,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 304 tests
+python -m pytest -q                     # 335 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```
