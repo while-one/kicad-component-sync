@@ -759,3 +759,160 @@ class TestRateLimit:
             provider.fetch_source_links(MPN)
         assert waits, "no pacing between requests"
         assert all(w >= 2.0 for w in waits), "under 30 calls per minute"
+
+
+class TestPrefetchBatching:
+    """Mouser accepts ten part numbers per request, so batch them.
+
+    The documented ceiling is 30 calls per minute and the provider sends one
+    part per call, so an unbatched 57-part run cannot finish inside a minute at
+    all. Batching turns 57 requests into 6.
+    """
+
+    @staticmethod
+    def _batch_response(parts: list[dict[str, Any]]) -> mock.MagicMock:
+        """Return a response carrying the given product records.
+
+        Args:
+            parts: Product records to return.
+
+        Returns:
+            A mock response.
+        """
+        return response(
+            200,
+            {
+                "Errors": [],
+                "SearchResults": {"NumberOfResult": len(parts), "Parts": parts},
+            },
+        )
+
+    @staticmethod
+    def _record(mpn: str) -> dict[str, Any]:
+        """Return a minimal product record for a part number.
+
+        Args:
+            mpn: The manufacturer part number.
+
+        Returns:
+            A product record.
+        """
+        return {
+            "ManufacturerPartNumber": mpn,
+            "Manufacturer": "YAGEO",
+            "ProductDetailUrl": f"https://www.mouser.example/{mpn}",
+        }
+
+    @staticmethod
+    def _echo(url: str, **kwargs: Any) -> mock.MagicMock:
+        """Return a response echoing whatever part numbers were requested.
+
+        Args:
+            url: The request URL, unused.
+            **kwargs: The request keyword arguments.
+
+        Returns:
+            A mock response carrying one record per requested part.
+        """
+        keyword = str(kwargs["json"]["SearchByPartRequest"]["mouserPartNumber"])
+        return TestPrefetchBatching._batch_response(
+            [TestPrefetchBatching._record(part) for part in keyword.split("|")]
+        )
+
+    def test_ten_parts_per_request(self) -> None:
+        """Twenty parts cost two requests, not twenty."""
+        provider = make_provider()
+        session_of(provider).post.side_effect = self._echo
+        parts = [f"PART-{i:03d}" for i in range(20)]
+        provider.prefetch(parts)
+        assert session_of(provider).post.call_count == 2
+
+    def test_duplicate_and_blank_parts_are_collapsed(self) -> None:
+        """Repeats cost nothing, since the cache would answer them anyway."""
+        provider = make_provider()
+        session_of(provider).post.side_effect = self._echo
+        provider.prefetch(["A", "A", "  ", "B", "A"])
+        sent = session_of(provider).post.call_args.kwargs["json"]
+        assert sent["SearchByPartRequest"]["mouserPartNumber"] == "A|B"
+
+    def test_prefetched_parts_need_no_further_request(self) -> None:
+        """A per-part lookup after a prefetch is answered from memory."""
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: self._batch_response(
+            [self._record("GOOD-1")]
+        )
+        provider.prefetch(["GOOD-1"])
+        calls_after_prefetch = session_of(provider).post.call_count
+
+        links = provider.fetch_source_links("GOOD-1")
+
+        assert links[LINK_FIELD] == "https://www.mouser.example/GOOD-1"
+        assert session_of(provider).post.call_count == calls_after_prefetch
+
+    def test_a_prefetched_part_never_waits_for_pacing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A resolved part must not sleep before returning.
+
+        The check has to come before the pacing sleep, or 55 prefetched parts
+        still cost 55 intervals, which is what made a run take two minutes.
+        """
+        waits: list[float] = []
+        monkeypatch.setattr(
+            "component_sync.providers.mouser.time.sleep", lambda s: waits.append(s)
+        )
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: self._batch_response(
+            [self._record(f"PART-{i}") for i in range(3)]
+        )
+        provider.prefetch(["PART-0", "PART-1", "PART-2"])
+        waits.clear()
+
+        for part in ("PART-0", "PART-1", "PART-2"):
+            provider.fetch_source_links(part)
+
+        assert not waits, f"prefetched lookups must not sleep, slept {waits}"
+
+    def test_an_unstocked_part_is_remembered_as_a_miss(self) -> None:
+        """A batch omits parts it cannot find, with no error at all.
+
+        Remembering the absence as an empty result stops the per-part path from
+        issuing a request that would also come back empty.
+        """
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: self._batch_response([])
+        provider.prefetch(["GONE-1"])
+        with pytest.raises(PartNotFoundError):
+            provider.fetch_source_links("GONE-1")
+
+    def test_a_failed_batch_falls_back_to_per_part(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Prefetch is an optimisation, so its failure must lose no part."""
+        monkeypatch.setattr("component_sync.providers.mouser.time.sleep", lambda _s: None)
+        provider = make_provider()
+
+        def dispatch(url: str, **kwargs: Any) -> mock.MagicMock:
+            keyword = str(kwargs["json"]["SearchByPartRequest"]["mouserPartNumber"])
+            if "|" in keyword:
+                return response(500, {"detail": "batch failed"})
+            return self._batch_response([self._record(keyword)])
+
+        session_of(provider).post.side_effect = dispatch
+        provider.prefetch(["SOLO-1"])
+        assert provider.fetch_source_links("SOLO-1")[LINK_FIELD]
+
+    def test_http_requests_are_counted_separately_from_lookups(self) -> None:
+        """The quota is counted in HTTP requests, so that is what is reported."""
+        parts = [f"PART-{i:03d}" for i in range(20)]
+        provider = make_provider()
+        session_of(provider).post.side_effect = lambda url, **kw: self._batch_response(
+            [
+                self._record(p)
+                for p in str(kw["json"]["SearchByPartRequest"]["mouserPartNumber"]).split("|")
+            ]
+        )
+        provider.prefetch(parts)
+        for part in parts:
+            provider.fetch_source_links(part)
+        assert provider.http_requests == 2, "twenty parts, two requests"

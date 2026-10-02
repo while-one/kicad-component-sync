@@ -30,7 +30,70 @@ from typing import TextIO
 from .models import ChangeAction, ProcessResult, PropertyChange
 from .selection import FieldSelection
 
-__all__ = ["Palette", "render_report", "default_palette"]
+__all__ = ["Palette", "render_report", "default_palette", "ProgressReporter"]
+
+
+class ProgressReporter:
+    """Prints what a run is doing while it does it.
+
+    A run over this library makes around 60 requests. Without output that is a
+    minute or two of apparent silence, and a run that then fails looks
+    indistinguishable from one that has hung. Each stage is announced and each
+    part is named as it is fetched, so progress is visible and a stall is
+    locatable.
+
+    Progress goes to standard error, keeping standard output for the report
+    alone, so ``... > report.txt`` captures the findings without interleaved
+    chatter.
+
+    Attributes:
+        enabled: Whether anything is printed at all.
+    """
+
+    def __init__(self, enabled: bool = True, stream: TextIO | None = None) -> None:
+        """Initialise the reporter.
+
+        Args:
+            enabled: Set false to silence all progress output.
+            stream: Destination, defaulting to standard error.
+        """
+        self.enabled = enabled
+        self._stream = stream
+
+    def _out(self) -> TextIO:
+        """Return the destination stream.
+
+        Returns:
+            Standard error, or the stream supplied at construction.
+        """
+        return sys.stderr if self._stream is None else self._stream
+
+    def stage(self, text: str) -> None:
+        """Announce a stage of the run.
+
+        Args:
+            text: A short description such as ``"Processing"``.
+        """
+        if self.enabled:
+            print(f"\n{text}", file=self._out(), flush=True)
+
+    def detail(self, text: str) -> None:
+        """Report one item of work.
+
+        Args:
+            text: What is being done, naming the part involved.
+        """
+        if self.enabled:
+            print(f"  {text}", file=self._out(), flush=True)
+
+    def note(self, text: str) -> None:
+        """Report an informational line.
+
+        Args:
+            text: The message.
+        """
+        if self.enabled:
+            print(text, file=self._out(), flush=True)
 
 
 class Palette:

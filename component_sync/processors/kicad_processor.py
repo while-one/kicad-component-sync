@@ -105,12 +105,15 @@ class KiCadSymProcessor(BaseProcessor):
         seen: set[str] = set()
         examined = 0
 
+        # Collect the parts first, so a provider that accepts several part
+        # numbers per request can answer them all at once and so progress can be
+        # announced before the slow stage rather than during it.
+        targets: list[tuple[SList, str, str]] = []
         for symbol in root.children("symbol"):
             name_node = symbol.items[1] if len(symbol.items) > 1 else None
             if not isinstance(name_node, SString):
                 continue
             symbol_name = name_node.value
-
             mpn = self._read_property(symbol, "Part") or self._read_property(
                 symbol, "MPN"
             )
@@ -121,7 +124,15 @@ class KiCadSymProcessor(BaseProcessor):
             if not self.components.admits(symbol_name, mpn):
                 continue
             examined += 1
+            targets.append((symbol, symbol_name, mpn))
 
+        self.progress.stage(f"Fetching information for {len(targets)} part(s)")
+        mpns = [mpn for _, _, mpn in targets]
+        self._prefetch(mpns, mpns)
+        self.progress.stage(f"Processing {len(targets)} symbol(s)")
+
+        for symbol, symbol_name, mpn in targets:
+            self.progress.detail(f"Processing {symbol_name}")
             existing = self._properties(symbol)
             wanted, reason = self._desired(mpn, existing)
             if wanted is None:
@@ -139,8 +150,11 @@ class KiCadSymProcessor(BaseProcessor):
                 edits.extend(self._edits_for(symbol, text, existing, row_changes))
 
         if edits:
+            self.progress.stage(f"Applying {len(edits)} edit(s) to {file_path.name}")
             atomic_write(file_path, apply_edits(text, edits))
             LOGGER.info("Applied %d span edits to %s", len(edits), file_path)
+        elif not dry:
+            self.progress.stage("Nothing to apply")
 
         result = ProcessResult(
             file_path=str(file_path),
@@ -148,7 +162,7 @@ class KiCadSymProcessor(BaseProcessor):
             missing_parts=tuple(missing),
             dry_run=dry,
             written=bool(edits),
-            lookups=self.cache.stats.describe(),
+            lookups=self._lookup_summary(),
             failed_parts=tuple(failed),
             components_examined=examined if self.components.is_active() else None,
         )

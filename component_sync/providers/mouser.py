@@ -29,12 +29,14 @@ import logging
 import os
 import re
 import time
+from collections.abc import Sequence
 from typing import Any
 
 import requests
 
 from ..exceptions import (
     AmbiguousPartError,
+    ComponentSyncError,
     ConfigurationError,
     PartNotFoundError,
     ProviderAPIError,
@@ -139,6 +141,11 @@ class MouserProvider(BaseProvider):
         self._owns_session = session is None
         #: Monotonic timestamp of the last request, for pacing.
         self._last_request: float | None = None
+        #: Bulk results from :meth:`prefetch`, keyed by part number. A part
+        #: present with an empty list was looked up and is not stocked.
+        self._prefetched: dict[str, list[dict[str, Any]]] = {}
+        #: HTTP requests actually issued, which is what the quota counts.
+        self._http_requests = 0
 
     def authenticate(self) -> None:
         """Validate that an API key is configured.
@@ -211,6 +218,11 @@ class MouserProvider(BaseProvider):
             mpn, tuple(_describe(part) for part in matches)
         )
 
+    @property
+    def http_requests(self) -> int:
+        """Return how many search requests have been issued."""
+        return self._http_requests
+
     def close(self) -> None:
         """Release any network resources held by this provider."""
         if self._owns_session:
@@ -219,6 +231,114 @@ class MouserProvider(BaseProvider):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+    def prefetch(self, parts: Sequence[str]) -> None:
+        """Resolve many part numbers in batches of ten.
+
+        Mouser accepts up to ten pipe-separated part numbers per request, so a
+        57-part run costs 6 requests instead of 57. That matters because the
+        documented ceiling is only 30 calls per minute: unbatched, a 57-part run
+        cannot complete inside a minute at all.
+
+        Results are stored per part, including the empty result for a part that
+        is not stocked, so a later per-part lookup never needs the network.
+
+        Args:
+            parts: The manufacturer part numbers the run will need.
+        """
+        wanted = [part.strip() for part in parts if part.strip()]
+        unique: list[str] = []
+        for part in wanted:
+            if part not in unique and part not in self._prefetched:
+                unique.append(part)
+        for start in range(0, len(unique), MAX_PARTS_PER_REQUEST):
+            chunk = unique[start : start + MAX_PARTS_PER_REQUEST]
+            for part in chunk:
+                self._prefetched[part] = []
+            try:
+                records = self._search_many(chunk)
+            except ComponentSyncError as exc:
+                # Leave the chunk primed as empty so the per-part path retries
+                # it individually rather than losing the part.
+                LOGGER.warning(
+                    "Mouser prefetch of %d part(s) failed: %s", len(chunk), exc
+                )
+                continue
+            for part in chunk:
+                key = part.strip().casefold()
+                for record in records:
+                    if (
+                        str(record.get("ManufacturerPartNumber", "")).strip().casefold()
+                        == key
+                    ):
+                        self._prefetched[part] = [record]
+                        break
+
+    def _search_many(self, parts: list[str]) -> list[dict[str, Any]]:
+        """Search for several part numbers in one request.
+
+        Args:
+            parts: Up to :data:`MAX_PARTS_PER_REQUEST` part numbers.
+
+        Returns:
+            Every product record returned, of any of the requested parts.
+
+        Raises:
+            RateLimitError: If the per-minute limit survives every retry.
+            ProviderAPIError: On a transport failure, a non-200 response, a
+                malformed body, or an error the API reported.
+        """
+        body = {"SearchByPartRequest": {"mouserPartNumber": "|".join(parts)}}
+        attempt = 0
+        while True:
+            self._pace()
+            self._http_requests += 1
+            try:
+                response = self._session.post(
+                    f"{SEARCH_URL}?apiKey={self.api_key}",
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                    json=body,
+                    timeout=self.timeout,
+                )
+            except requests.RequestException as exc:
+                raise ProviderAPIError(f"Mouser search failed: {exc}") from exc
+
+            try:
+                payload: dict[str, Any] = response.json()
+            except ValueError as exc:
+                raise ProviderAPIError(f"Malformed Mouser response: {exc}") from exc
+
+            if _is_rate_limit(response.status_code, payload):
+                attempt += 1
+                if attempt > _MAX_RETRIES:
+                    raise RateLimitError(
+                        f"Mouser per-minute limit still refusing after "
+                        f"{_MAX_RETRIES} retries (30 calls per minute)."
+                    )
+                wait = min(_MIN_REQUEST_INTERVAL * (2**attempt), _MAX_BACKOFF)
+                LOGGER.warning(
+                    "Mouser rate limit hit; waiting %.1fs (retry %d/%d)",
+                    wait,
+                    attempt,
+                    _MAX_RETRIES,
+                )
+                time.sleep(wait)
+                continue
+
+            if response.status_code != 200:
+                raise ProviderAPIError(f"Mouser search failed: {_summarise(response, payload)}")
+
+            errors = payload.get("Errors") or []
+            if errors:
+                messages = "; ".join(
+                    str(error.get("Message", "")) for error in errors if isinstance(error, dict)
+                )
+                raise ProviderAPIError(f"Mouser rejected the request: {messages or 'error'}")
+
+            found: list[dict[str, Any]] = list(
+                (payload.get("SearchResults") or {}).get("Parts") or []
+            )
+            return found
+
     def _pace(self) -> None:
         """Sleep if the previous request was too recent.
 
@@ -253,6 +373,13 @@ class MouserProvider(BaseProvider):
             ProviderAPIError: On a transport failure, a non-200 response, a
                 malformed body, or an error the API reported.
         """
+        # Answered from a batch prefetch, if there is one. This check comes
+        # before the pacing sleep: a part already resolved must not wait 2.1
+        # seconds for a request it will never make.
+        cached = self._prefetched.get(mpn)
+        if cached is not None:
+            return list(cached)
+
         body = {
             "SearchByPartRequest": {
                 "mouserPartNumber": mpn,
@@ -321,7 +448,6 @@ class MouserProvider(BaseProvider):
                 for part in (payload.get("SearchResults") or {}).get("Parts") or []
                 if str(part.get("ManufacturerPartNumber", "")).strip().casefold() == wanted
             ]
-
 
 def _normalise_manufacturer(name: str) -> str:
     """Reduce a manufacturer name to comparable letters.

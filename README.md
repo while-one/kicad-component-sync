@@ -134,6 +134,39 @@ plain text. `NO_COLOR` is honoured and `--no-color` forces it off. `--width N`
 sets the maximum width of a rendered value, since some datasheet URLs run past
 250 characters.
 
+### Progress
+
+A run makes around 65 requests and takes about 45 seconds, so each stage is
+announced and every part is named as it is waited for. A run that then fails is
+distinguishable from one that has hung:
+
+```
+Fetching information for 57 part(s)
+
+Fetching information from digikey and 1 sourcing provider(s)
+  Fetching information for GRM155R61C104KA88D
+  ...
+
+Processing 57 symbol(s)
+  Processing GRM155R61C104KA88D
+  ...
+
+Applying 4 edit(s) to sx-cubit-obsidian.kicad_sym
+```
+
+Progress goes to **standard error**, keeping standard output for the report
+alone, so `... > report.txt` captures the findings without interleaved chatter.
+`-q` silences it entirely; findings are still reported.
+
+The run summary counts **HTTP requests**, per provider, because that is what a
+quota is counted in. Once a provider batches, its per-part lookups are answered
+from memory, so counting method calls would overstate the quota used by an order
+of magnitude:
+
+```
+65 HTTP request(s) [digikey 59, mouser 6]; cache: 0 reused, 113 provider lookups
+```
+
 ## The KiCad workflow
 
 **KiCad 10 exposes no Python API for the Schematic or Symbol editor.** There is a
@@ -447,10 +480,11 @@ the CLI automatically.
 
 - **The daily quota is real.** 1000 requests/day, resetting at midnight UTC.
   A full run costs about 70. See *Rate limits* above.
-- **Mouser requests are not batched.** The API accepts up to 10 part numbers per
-  call, which would turn a 57-part run from 57 requests into 6, but the
-  processor queries one part at a time. Requests are therefore paced to stay
-  under Mouser's 30 calls per minute, which costs a couple of minutes per run.
+- **Only Mouser batches its requests.** DigiKey's search takes one keyword per
+  call, so its 57 parts are 57 requests by necessity. Mouser accepts ten pipe
+  separated part numbers, so a run of the same 57 parts costs it 6 requests
+  instead of 57, which is what makes it fit inside Mouser's 30-calls-per-minute
+  ceiling at all.
 - **The cache is per-run, not on disk.** Starting a second run re-requests
   everything. Persisting responses across runs would go stale, and a stale price
   or stock figure is worse than a slow run.
@@ -464,7 +498,7 @@ the CLI automatically.
 ## Development
 
 ```bash
-python -m pytest -q                     # 335 tests
+python -m pytest -q                     # 347 tests
 python -m mypy --strict component_sync  # clean
 python -m ruff check component_sync     # clean
 ```

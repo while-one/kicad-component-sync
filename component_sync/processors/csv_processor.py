@@ -81,6 +81,10 @@ class CSVProcessor(BaseProcessor):
         column_values: dict[int, dict[str, str]] = {}
         examined = 0
 
+        # Collect first, so a provider that accepts several part numbers per
+        # request can answer them all at once and progress is announced before
+        # the slow stage rather than during it.
+        targets: list[tuple[list[str], str]] = []
         for row in rows[1:]:
             if not row or mpn_index >= len(row):
                 continue
@@ -93,7 +97,13 @@ class CSVProcessor(BaseProcessor):
             if not self.components.admits(reference, mpn):
                 continue
             examined += 1
+            targets.append((row, mpn))
 
+        self._prefetch([mpn for _, mpn in targets], [mpn for _, mpn in targets])
+        self.progress.stage(f"Processing {len(targets)} row(s)")
+
+        for row, mpn in targets:
+            self.progress.detail(f"Processing {mpn}")
             existing = {
                 name: (row[i] if i < len(row) else "")
                 for i, name in enumerate(header)
@@ -117,11 +127,14 @@ class CSVProcessor(BaseProcessor):
         header, rows = self._apply(rows, header, mpn_index, column_values)
 
         if changes and not dry:
+            self.progress.stage(f"Applying {len(changes)} change(s) to {file_path.name}")
             rows[0] = header  # rows[0] is the header row itself
             buffer = io.StringIO()
             writer = csv.writer(buffer, dialect, quoting=dialect.quoting)
             writer.writerows(rows)
             atomic_write(file_path, buffer.getvalue())
+        elif not dry:
+            self.progress.stage("Nothing to apply")
 
         result = ProcessResult(
             file_path=str(file_path),
@@ -129,7 +142,7 @@ class CSVProcessor(BaseProcessor):
             missing_parts=tuple(missing),
             dry_run=dry,
             written=bool(changes) and not dry,
-            lookups=self.cache.stats.describe(),
+            lookups=self._lookup_summary(),
             failed_parts=tuple(failed),
             components_examined=examined if self.components.is_active() else None,
         )

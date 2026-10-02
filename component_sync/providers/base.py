@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from enum import Enum
 
 from ..models import ComponentData
@@ -107,6 +108,33 @@ class BaseProvider(ABC):
         """
         _ = manufacturer
         return self.fetch_component_data(mpn).source_properties()
+
+    @property
+    def http_requests(self) -> int:
+        """How many HTTP requests this provider has actually issued.
+
+        Quotas are counted in HTTP requests, not in method calls. Once a
+        provider prefetches a run in batches, its per-part lookups are answered
+        from memory, so counting those would report a far larger figure than the
+        distributor ever saw and would make quota use impossible to judge.
+        """
+        return 0
+
+    def prefetch(self, parts: Sequence[str]) -> None:  # noqa: B027 - optional hook
+        """Resolve several part numbers in as few requests as the API allows.
+
+        A provider whose endpoint accepts more than one part number per request
+        can answer a whole run far more cheaply than one call per part: Mouser
+        takes ten, which turns a 57-part run from 57 requests into 6. Providers
+        that only handle one part number per call do nothing here.
+
+        This is an optimisation, never a requirement. A part that was not
+        prefetched, or whose prefetch failed, is still resolved individually by
+        :meth:`fetch_component_data`, so correctness does not depend on it.
+
+        Args:
+            parts: The manufacturer part numbers the run will need.
+        """
 
     def close(self) -> None:  # noqa: B027 - optional hook, deliberately concrete
         """Release any network resources held by this provider.

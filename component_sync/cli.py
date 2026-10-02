@@ -20,6 +20,7 @@ from .processors.csv_processor import CSVProcessor
 from .processors.kicad_processor import KiCadSymProcessor
 from .providers.base import BaseProvider, ProviderRole
 from .providers.factory import ProviderFactory
+from .reporting import ProgressReporter
 from .selection import ComponentFilter, FieldSelection
 
 __all__ = ["main", "build_parser", "select_processor"]
@@ -146,6 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress progress output. Findings are still reported.",
+    )
+    parser.add_argument(
         "--no-color",
         action="store_true",
         help="Disable colour even when writing to a terminal.",
@@ -252,6 +259,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 width=args.width,
                 sources=sources,
                 components=ComponentFilter.build(args.component),
+                progress=ProgressReporter(not args.quiet),
             )
             result = processor.process(input_file)
     except ComponentSyncError as exc:

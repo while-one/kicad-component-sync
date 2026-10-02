@@ -16,7 +16,7 @@ from ..exceptions import (  # noqa: F401  (FileFormatError re-exported for subcl
 )
 from ..models import ChangeAction, ComponentData, ProcessResult, PropertyChange
 from ..providers.base import BaseProvider
-from ..reporting import Palette, default_palette, render_report
+from ..reporting import Palette, ProgressReporter, default_palette, render_report
 from ..selection import ComponentFilter, FieldSelection
 
 __all__ = ["BaseProcessor", "atomic_write"]
@@ -93,6 +93,7 @@ class BaseProcessor(ABC):
         width: int = 60,
         sources: tuple[BaseProvider, ...] = (),
         components: ComponentFilter | None = None,
+        progress: ProgressReporter | None = None,
     ) -> None:
         """Initialise the processor.
 
@@ -107,6 +108,7 @@ class BaseProcessor(ABC):
                 contributing purchasing links only.
             components: Restricts the run to matching components, applied before
                 any lookup so an excluded component costs no request.
+            progress: Reports what the run is doing while it does it.
         """
         self.provider = provider
         self.sources = sources
@@ -114,9 +116,28 @@ class BaseProcessor(ABC):
         self.cache = LookupCache()
         self.fields = fields if fields is not None else FieldSelection()
         self.components = components if components is not None else ComponentFilter()
+        self.progress = progress if progress is not None else ProgressReporter(False)
         self._colour = colour
         self.width = width
         self.seen_count = 0
+
+    def _lookup_summary(self) -> str:
+        """Return a one line summary of what the run cost.
+
+        Reports actual HTTP requests, because a distributor's quota is counted
+        that way. Once a sourcing provider prefetches in batches, its per-part
+        lookups are answered from memory, so counting method calls would
+        overstate the quota used by an order of magnitude.
+
+        Returns:
+            A summary naming the request total and the cache's effectiveness.
+        """
+        providers = (self.provider, *self.sources)
+        total = sum(provider.http_requests for provider in providers)
+        by_provider = ", ".join(
+            f"{provider.name} {provider.http_requests}" for provider in providers
+        )
+        return f"{total} HTTP request(s) [{by_provider}]; {self.cache.stats.describe()}"
 
     def palette(self) -> Palette:
         """Return the colour helper this processor should report with.
@@ -173,6 +194,36 @@ class BaseProcessor(ABC):
             Component data, or ``None`` when the provider has no match.
         """
         return self.cache.fetch(self.provider, mpn)
+
+    def _prefetch(self, parts: list[str], labels: list[str] | None = None) -> None:
+        """Let each provider resolve the whole part list in as few calls as it can.
+
+        A provider that accepts several part numbers per request does the work
+        here; one that does not returns immediately. A provider that fails is
+        left to be retried part by part, so prefetch is an optimisation only.
+
+        The part numbers are listed before the calls rather than after, so the
+        output names what is being waited for while it is being waited for.
+
+        Args:
+            parts: Every part number the run will need.
+            labels: What to call each part in the progress output, one per entry
+                of ``parts``. Defaults to the part numbers themselves.
+        """
+        if not parts:
+            return
+        names = labels if labels is not None else parts
+        self.progress.stage(
+            f"Fetching information from {self.provider.name} "
+            f"and {len(self.sources)} sourcing provider(s)"
+        )
+        for name in names:
+            self.progress.detail(f"Fetching information for {name}")
+        for provider in (self.provider, *self.sources):
+            try:
+                provider.prefetch(parts)
+            except ComponentSyncError as exc:
+                LOGGER.warning("Prefetch from %s failed: %s", provider.name, exc)
 
     def _desired(
         self, mpn: str, existing: dict[str, str]

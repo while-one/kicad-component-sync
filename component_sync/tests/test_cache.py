@@ -242,7 +242,7 @@ class TestCacheLifecycle:
             cache.fetch(stub_provider, "GRM155R61C104KA88D")
         text = cache.stats.describe()
         assert "2 reused" in text
-        assert "1 requested" in text
+        assert "1 provider lookups" in text
 
     def test_request_counts_add_up(self) -> None:
         """``requests_made`` counts only calls that left the process."""

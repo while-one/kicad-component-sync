@@ -160,6 +160,8 @@ class DigiKeyProvider(BaseProvider):
         self._token: str | None = None
         #: Monotonic timestamp of the last product request, for pacing.
         self._last_request: float | None = None
+        #: HTTP requests actually issued, which is what the quota counts.
+        self._http_requests = 0
         self._token_expiry: float = 0.0
 
     # ------------------------------------------------------------------
@@ -186,6 +188,7 @@ class DigiKeyProvider(BaseProvider):
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
 
+        self._http_requests += 1
         try:
             response = self._session.post(
                 TOKEN_URL,
@@ -330,6 +333,7 @@ class DigiKeyProvider(BaseProvider):
         attempt = 0
         while True:
             self._pace()
+            self._http_requests += 1
             try:
                 response = self._session.post(
                     PRODUCT_URL, headers=headers, json=body, timeout=self.timeout
@@ -427,6 +431,11 @@ class DigiKeyProvider(BaseProvider):
                 # A short page is the last page; there is nothing more to fetch.
                 break
         return None
+
+    @property
+    def http_requests(self) -> int:
+        """Return how many product requests have been issued."""
+        return self._http_requests
 
     def close(self) -> None:
         """Close the underlying HTTP session if this provider created it."""

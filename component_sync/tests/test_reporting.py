@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from component_sync.models import ChangeAction, ProcessResult, PropertyChange
 from component_sync.processors.kicad_processor import KiCadSymProcessor
 from component_sync.reporting import (
     Palette,
+    ProgressReporter,
     _truncate,
     default_palette,
     render_report,
@@ -800,3 +802,82 @@ class TestComponentFilterInProcessor:
         ).process(self._library(tmp_path))
         out = render_report(result, palette=Palette(False), selection=FieldSelection())
         assert "filter: 1 component(s) in scope" in out
+
+
+class TestProgressReporter:
+    """A run makes around 60 requests, so silence is indistinguishable from a hang."""
+
+    def test_stage_and_detail_are_printed(self) -> None:
+        """Each stage is announced and each part is named."""
+        stream = io.StringIO()
+        reporter = ProgressReporter(True, stream)
+        reporter.stage("Fetching information for 5 part(s)")
+        reporter.detail("Fetching information for GRM155R61C104KA88D")
+        text = stream.getvalue()
+        assert "Fetching information for 5 part(s)" in text
+        assert "  Fetching information for GRM155R61C104KA88D" in text
+
+    def test_disabled_prints_nothing(self) -> None:
+        """Quiet mode is genuinely silent."""
+        stream = io.StringIO()
+        reporter = ProgressReporter(False, stream)
+        reporter.stage("Processing")
+        reporter.detail("Processing R1")
+        assert stream.getvalue() == ""
+
+    def test_defaults_to_standard_error(self) -> None:
+        """Progress must not interleave with the report on standard output.
+
+        Redirecting stdout to a file should capture the findings alone.
+        """
+        reporter = ProgressReporter(True)
+        assert reporter._out() is sys.stderr
+
+    def test_processors_announce_their_stages(
+        self, tmp_path: Path, kicad_sym_text: str, stub_provider: object
+    ) -> None:
+        """A dry run says what it is doing rather than printing nothing."""
+        from component_sync.models import ComponentData
+
+        provider = stub_provider
+        provider.catalogue["GRM155R61C104KA88D"] = ComponentData(  # type: ignore[attr-defined]
+            mpn="GRM155R61C104KA88D", manufacturer="Murata"
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(kicad_sym_text, encoding="utf-8")
+        stream = io.StringIO()
+
+        KiCadSymProcessor(
+            provider,  # type: ignore[arg-type]
+            dry_run=True,
+            colour=False,
+            progress=ProgressReporter(True, stream),
+        ).process(path)
+
+        text = stream.getvalue()
+        assert "Fetching information for 1 part(s)" in text
+        assert "Fetching information for GRM155R61C104KA88D" in text
+        assert "Processing 1 symbol(s)" in text
+        assert "Processing TESTCAP" in text
+
+    def test_write_run_announces_applying(
+        self, tmp_path: Path, kicad_sym_text: str, stub_provider: object
+    ) -> None:
+        """The write stage is named, so a pause before it is explicable."""
+        from component_sync.models import ComponentData
+
+        provider = stub_provider
+        provider.catalogue["GRM155R61C104KA88D"] = ComponentData(  # type: ignore[attr-defined]
+            mpn="GRM155R61C104KA88D", manufacturer="Murata"
+        )
+        path = tmp_path / "lib.kicad_sym"
+        path.write_text(kicad_sym_text, encoding="utf-8")
+        stream = io.StringIO()
+
+        KiCadSymProcessor(
+            provider,  # type: ignore[arg-type]
+            colour=False,
+            progress=ProgressReporter(True, stream),
+        ).process(path)
+
+        assert "Applying" in stream.getvalue()

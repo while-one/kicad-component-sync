@@ -78,7 +78,7 @@ class CacheStats:
         """
         return (
             f"cache: {self.hits + self.negative_hits} reused, "
-            f"{self.requests_made} requested "
+            f"{self.requests_made} provider lookups "
             f"(+{self.hits} value hits, +{self.negative_hits} miss hits, "
             f"{self.failures} failed)"
         )
